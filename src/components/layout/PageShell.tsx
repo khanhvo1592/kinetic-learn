@@ -3,10 +3,8 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import TopBar from './TopBar';
 import BottomNav from './BottomNav';
 import Sidebar from './Sidebar';
-import AdminPanel from '../modals/AdminPanel';
 
 export default function PageShell() {
-  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const navigate = useNavigate();
 
@@ -26,7 +24,7 @@ export default function PageShell() {
         <TopBar 
           notificationsCount={notifications.length}
           onToggleNotifications={() => setShowNotifications(true)}
-          onOpenAdmin={() => setIsAdminOpen(true)}
+          onOpenAdmin={() => navigate('/admin')}
         />
 
         <div className="flex-1 overflow-y-auto scroll-hide md:p-6 lg:p-10">
@@ -60,9 +58,6 @@ export default function PageShell() {
           </div>
         </div>
       )}
-
-      {/* Admin Panel */}
-      {isAdminOpen && <AdminPanel onClose={() => setIsAdminOpen(false)} />}
     </div>
   );
 }

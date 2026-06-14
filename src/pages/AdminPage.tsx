@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Subject, Lesson, QuizQuestion, Student } from '../../types';
-import { useAppContext } from '../../contexts/AppContext';
-import { useAuth } from '../../hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
+import { Subject, Lesson, QuizQuestion, Student } from '../types';
+import { useAppContext } from '../contexts/AppContext';
+import { useAuth } from '../hooks/useAuth';
 
-interface AdminPanelProps {
-  onClose: () => void;
-}
-
-export default function AdminPanel({ onClose }: AdminPanelProps) {
+export default function AdminPage() {
+  const navigate = useNavigate();
   const { 
     subjects, lessons, quizzes, allStudents: students, 
     addSubject: onAddSubject, addLesson: onAddLesson, 
@@ -58,6 +56,12 @@ export default function AdminPanel({ onClose }: AdminPanelProps) {
   const [newStudRole, setNewStudRole] = useState<'student' | 'teacher'>('student');
   const [newStudAvatar, setNewStudAvatar] = useState('https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=120');
   const [newStudTeacherId, setNewStudTeacherId] = useState('');
+
+  const getYoutubeId = (url: string) => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+  };
 
   const triggerToast = (msg: string) => {
     setSuccessMsg(msg);
@@ -281,73 +285,76 @@ export default function AdminPanel({ onClose }: AdminPanelProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-[32px] border-4 border-[#0058be] p-6 w-full max-w-3xl shadow-[0_16px_0_0_#004395] flex flex-col h-[640px] max-h-[92vh] animate-fadeIn">
-        
-        {/* Header bar */}
-        <div className="flex justify-between items-center mb-4 flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[#0058be] text-3xl font-bold animate-pulse">admin_panel_settings</span>
+    <div className="min-h-screen bg-slate-50 flex">
+      {/* Sidebar */}
+      <div className="w-72 bg-white border-r border-slate-200 flex flex-col h-screen sticky top-0">
+        <div className="p-6 border-b border-slate-100">
+          <div className="flex items-center gap-3 mb-2">
+            <span className="material-symbols-outlined text-[#0058be] text-3xl font-bold">admin_panel_settings</span>
             <div>
-              <h3 className="font-display font-black text-xl text-[#0058be]">Tổng Không Gian Quản Trị Admins</h3>
-              <p className="text-[10px] text-slate-450 font-sans tracking-wide">Quản lý tài khoản học sinh, cơ sở dữ liệu khóa học và trắc nghiệm</p>
+              <h3 className="font-display font-black text-lg text-[#0058be] leading-tight">Admin<br/>Workspace</h3>
             </div>
           </div>
-          <button 
-            onClick={onClose}
-            className="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer transition-colors"
-          >
-            <span className="material-symbols-outlined font-bold">close</span>
-          </button>
+          <p className="text-[11px] text-slate-500 font-sans mt-2 leading-relaxed">
+            Hệ thống quản lý nội dung và tài khoản tập trung.
+          </p>
         </div>
 
-        {/* Navigation Tabs row */}
-        <div className="flex border-b border-slate-100 pb-2 mb-4 overflow-x-auto gap-1 flex-shrink-0 no-scrollbar">
+        <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
           {isAdmin && (
             <button
               onClick={() => setActiveTab('students')}
-              className={`pb-3 px-4 font-display font-bold text-xs border-b-4 transition-all whitespace-nowrap flex items-center gap-1.5 ${
-                activeTab === 'students' ? 'border-[#0058be] text-[#0058be] font-black' : 'border-transparent text-slate-500 hover:text-slate-700'
+              className={`w-full text-left px-4 py-3 rounded-xl font-display font-bold text-sm transition-all flex items-center gap-3 ${
+                activeTab === 'students' ? 'bg-blue-50 text-[#0058be]' : 'bg-transparent text-slate-600 hover:bg-slate-50'
               }`}
             >
-              <span className="material-symbols-outlined text-sm">badge</span>
-              👤 Quản lý học sinh ({students.length})
+              <span className="material-symbols-outlined">badge</span>
+              Quản lý học sinh
             </button>
           )}
-          
           <button
             onClick={() => setActiveTab('subject')}
-            className={`pb-3 px-4 font-display font-semibold text-xs border-b-4 transition-all whitespace-nowrap flex items-center gap-1.5 ${
-              activeTab === 'subject' ? 'border-[#0058be] text-[#0058be] font-black' : 'border-transparent text-slate-500 hover:text-slate-700'
+            className={`w-full text-left px-4 py-3 rounded-xl font-display font-bold text-sm transition-all flex items-center gap-3 ${
+              activeTab === 'subject' ? 'bg-blue-50 text-[#0058be]' : 'bg-transparent text-slate-600 hover:bg-slate-50'
             }`}
           >
-            <span className="material-symbols-outlined text-sm">trophy</span>
-            🥇 Tạo môn học ({subjects.length})
+            <span className="material-symbols-outlined">trophy</span>
+            Tạo môn học
           </button>
-
           <button
             onClick={() => setActiveTab('lesson')}
-            className={`pb-3 px-4 font-display font-semibold text-xs border-b-4 transition-all whitespace-nowrap flex items-center gap-1.5 ${
-              activeTab === 'lesson' ? 'border-[#0058be] text-[#0058be] font-black' : 'border-transparent text-slate-500 hover:text-slate-700'
+            className={`w-full text-left px-4 py-3 rounded-xl font-display font-bold text-sm transition-all flex items-center gap-3 ${
+              activeTab === 'lesson' ? 'bg-blue-50 text-[#0058be]' : 'bg-transparent text-slate-600 hover:bg-slate-50'
             }`}
           >
-            <span className="material-symbols-outlined text-sm">menu_book</span>
-            📚 Tạo bài học ({lessons.length})
+            <span className="material-symbols-outlined">menu_book</span>
+            Tạo bài học
           </button>
-
           <button
             onClick={() => setActiveTab('quiz')}
-            className={`pb-3 px-4 font-display font-semibold text-xs border-b-4 transition-all whitespace-nowrap flex items-center gap-1.5 ${
-              activeTab === 'quiz' ? 'border-[#0058be] text-[#0058be] font-black' : 'border-transparent text-slate-500 hover:text-slate-700'
+            className={`w-full text-left px-4 py-3 rounded-xl font-display font-bold text-sm transition-all flex items-center gap-3 ${
+              activeTab === 'quiz' ? 'bg-blue-50 text-[#0058be]' : 'bg-transparent text-slate-600 hover:bg-slate-50'
             }`}
           >
-            <span className="material-symbols-outlined text-sm">quiz</span>
-            ❓ Thêm trắc nghiệm ({quizzes.length})
+            <span className="material-symbols-outlined">quiz</span>
+            Quản lý trắc nghiệm
           </button>
         </div>
 
-        {/* Scrollable form action contents */}
-        <div className="flex-1 overflow-y-auto pr-1 space-y-4 no-scrollbar">
+        <div className="p-4 border-t border-slate-100">
+          <button 
+            onClick={() => navigate('/')}
+            className="w-full px-4 py-3 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined text-sm">home</span>
+            Về Trang chủ
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-y-auto h-screen p-8 bg-[#f7f9fb]">
+        <div className="max-w-4xl mx-auto space-y-6">
           
           {/* Toast Notification message */}
           {successMsg && (
@@ -863,67 +870,122 @@ export default function AdminPanel({ onClose }: AdminPanelProps) {
               </div>
 
               {/* Dynamic Section Contents */}
-              <div className="p-4 bg-slate-50/55 rounded-2xl border border-slate-200/50 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-display font-black text-xs text-[#0058be]">Nội dung chi tiết ({lessonSections.length} mục)</span>
+              <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div>
+                    <span className="font-display font-black text-sm text-[#0058be] block">Nội dung bài giảng chi tiết</span>
+                    <span className="text-[10px] text-slate-500 font-sans">Thêm các khối nội dung (văn bản, video, hình ảnh)</span>
+                  </div>
                   <button 
                     type="button" 
                     onClick={() => setLessonSections([...lessonSections, { title: `Phần ${lessonSections.length + 1}`, content: '', type: 'text' }])}
-                    className="flex items-center gap-1 bg-white border border-[#0058be] text-[#0058be] px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-50"
+                    className="flex items-center gap-1 bg-blue-50 border border-blue-200 text-[#0058be] px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-[#0058be] hover:text-white transition-colors"
                   >
-                    <span className="material-symbols-outlined text-[12px]">add</span> Thêm mục
+                    <span className="material-symbols-outlined text-[14px]">add_box</span> Thêm khối mới
                   </button>
                 </div>
                 
-                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
                   {lessonSections.map((sec, idx) => (
-                    <div key={idx} className="space-y-1 relative p-3 bg-white border border-slate-200 rounded-lg">
+                    <div key={idx} className="space-y-3 relative p-4 bg-slate-50 border-2 border-slate-100 rounded-xl hover:border-[#0058be]/30 transition-colors group">
                       {lessonSections.length > 1 && (
                         <button 
                           type="button" 
                           onClick={() => setLessonSections(lessonSections.filter((_, i) => i !== idx))}
-                          className="absolute right-2 top-2 text-red-500 hover:bg-red-50 w-6 h-6 flex items-center justify-center rounded"
+                          className="absolute right-3 top-3 text-slate-400 hover:text-rose-500 hover:bg-rose-50 w-8 h-8 flex items-center justify-center rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                          title="Xóa khối này"
                         >
-                          <span className="material-symbols-outlined text-sm">close</span>
+                          <span className="material-symbols-outlined text-sm">delete</span>
                         </button>
                       )}
-                      <div className="flex gap-2">
-                        <input 
-                          type="text" 
-                          value={sec.title} 
-                          onChange={(e) => {
-                            const newSecs = [...lessonSections];
-                            newSecs[idx].title = e.target.value;
-                            setLessonSections(newSecs);
-                          }}
-                          placeholder="Tiêu đề mục..."
-                          className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 font-bold outline-none focus:border-[#0058be]"
-                        />
-                        <select 
-                          value={sec.type || 'text'}
-                          onChange={(e) => {
-                            const newSecs = [...lessonSections];
-                            newSecs[idx].type = e.target.value as any;
-                            setLessonSections(newSecs);
-                          }}
-                          className="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0058be]"
-                        >
-                          <option value="text">Văn bản</option>
-                          <option value="video">Video</option>
-                          <option value="image">Hình ảnh</option>
-                        </select>
+                      
+                      <div className="flex gap-3">
+                        <div className="flex-1 space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tiêu đề khối</label>
+                          <input 
+                            type="text" 
+                            value={sec.title} 
+                            onChange={(e) => {
+                              const newSecs = [...lessonSections];
+                              newSecs[idx].title = e.target.value;
+                              setLessonSections(newSecs);
+                            }}
+                            placeholder="Ví dụ: 1. Khái niệm cơ bản"
+                            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold outline-none focus:border-[#0058be] shadow-sm"
+                          />
+                        </div>
+                        <div className="w-32 space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Loại nội dung</label>
+                          <select 
+                            value={sec.type || 'text'}
+                            onChange={(e) => {
+                              const newSecs = [...lessonSections];
+                              newSecs[idx].type = e.target.value as any;
+                              // Clear content when changing type to avoid rendering broken links
+                              newSecs[idx].content = '';
+                              setLessonSections(newSecs);
+                            }}
+                            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold outline-none focus:border-[#0058be] shadow-sm"
+                          >
+                            <option value="text">📝 Văn bản</option>
+                            <option value="video">🎥 Video (YouTube)</option>
+                            <option value="image">🖼️ Hình ảnh</option>
+                          </select>
+                        </div>
                       </div>
-                      <textarea
-                        required
-                        value={sec.content}
-                        onChange={(e) => {
-                          const newSecs = [...lessonSections];
-                          newSecs[idx].content = e.target.value;
-                          setLessonSections(newSecs);
-                        }}
-                        placeholder={sec.type === 'video' ? 'Nhập link YouTube...' : sec.type === 'image' ? 'Nhập link ảnh...' : 'Nội dung...'}
-                        className="w-full h-20 bg-slate-50 border border-slate-200 rounded-lg p-2 resize-none outline-none focus:border-[#0058be]"
-                      />
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                          {sec.type === 'video' ? 'Link YouTube' : sec.type === 'image' ? 'Link hình ảnh (URL)' : 'Nội dung văn bản'}
+                        </label>
+                        {sec.type === 'text' ? (
+                          <textarea
+                            required
+                            value={sec.content}
+                            onChange={(e) => {
+                              const newSecs = [...lessonSections];
+                              newSecs[idx].content = e.target.value;
+                              setLessonSections(newSecs);
+                            }}
+                            placeholder="Nhập nội dung chi tiết bài học..."
+                            className="w-full h-32 bg-white border border-slate-200 rounded-lg p-3 text-sm resize-y outline-none focus:border-[#0058be] shadow-sm"
+                          />
+                        ) : (
+                          <input
+                            type="url"
+                            required
+                            value={sec.content}
+                            onChange={(e) => {
+                              const newSecs = [...lessonSections];
+                              newSecs[idx].content = e.target.value;
+                              setLessonSections(newSecs);
+                            }}
+                            placeholder={sec.type === 'video' ? 'https://www.youtube.com/watch?v=...' : 'https://example.com/image.jpg'}
+                            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#0058be] shadow-sm"
+                          />
+                        )}
+                        
+                        {/* Video Preview */}
+                        {sec.type === 'video' && sec.content && getYoutubeId(sec.content) && (
+                          <div className="mt-3 rounded-lg overflow-hidden border border-slate-200 bg-black/5 aspect-video w-full max-w-md">
+                            <iframe 
+                              width="100%" 
+                              height="100%" 
+                              src={`https://www.youtube.com/embed/${getYoutubeId(sec.content)}`} 
+                              title="YouTube video player" 
+                              frameBorder="0" 
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                              allowFullScreen
+                            ></iframe>
+                          </div>
+                        )}
+                        {/* Image Preview */}
+                        {sec.type === 'image' && sec.content && (
+                          <div className="mt-3 rounded-lg overflow-hidden border border-slate-200 bg-black/5 w-full max-w-md">
+                            <img src={sec.content} alt="Preview" className="w-full h-auto object-contain" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

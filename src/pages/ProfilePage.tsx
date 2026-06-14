@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useStudents } from '../hooks/useStudents';
+import { useNavigate } from 'react-router-dom';
 import LeaderboardCard from '../components/cards/LeaderboardCard';
-import AdminPanel from '../components/modals/AdminPanel';
 import ProfileEditModal from '../components/modals/ProfileEditModal';
 
 export default function ProfilePage() {
   const { currentUser, logout, isAdmin, isTeacher } = useAuth();
   const { getLeaderboard } = useStudents();
-  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+  const navigate = useNavigate();
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
 
   if (!currentUser) return null;
@@ -62,7 +62,7 @@ export default function ProfilePage() {
           {/* Admin Panel Button */}
           {(isAdmin || isTeacher) && (
             <button 
-              onClick={() => setIsAdminPanelOpen(true)}
+              onClick={() => navigate('/admin')}
               className="w-full bg-[#0058be] text-white font-display font-bold py-4 rounded-[20px] tactile-button shadow-[0_4px_0_0_#004395] hover:bg-blue-700 active:translate-y-[4px] active:shadow-none transition-all flex justify-center items-center gap-2"
             >
               <span className="material-symbols-outlined text-lg">admin_panel_settings</span>
@@ -99,7 +99,6 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {isAdminPanelOpen && <AdminPanel onClose={() => setIsAdminPanelOpen(false)} />}
       {isEditProfileOpen && <ProfileEditModal onClose={() => setIsEditProfileOpen(false)} />}
     </div>
   );

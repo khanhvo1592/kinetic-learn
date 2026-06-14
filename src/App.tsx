@@ -18,6 +18,7 @@ import QuizPage from './pages/QuizPage';
 import ResultPage from './pages/ResultPage';
 import SolutionsPage from './pages/SolutionsPage';
 import ExamPage from './pages/ExamPage';
+import AdminPage from './pages/AdminPage';
 
 // Auth Guard
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -82,6 +83,11 @@ export default function App() {
             <Route path="/exam" element={
               <RequireAuth>
                 <ExamPage />
+              </RequireAuth>
+            } />
+            <Route path="/admin" element={
+              <RequireAuth>
+                <AdminPage />
               </RequireAuth>
             } />
             
