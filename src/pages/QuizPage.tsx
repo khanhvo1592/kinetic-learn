@@ -13,7 +13,7 @@ export default function QuizPage() {
   
   const { 
     questions, currentIdx, timeLeft, userAnswers, isFinished,
-    score, selectAnswer, nextQuestion, finishQuiz
+    score, selectAnswer, nextQuestion, finishQuiz, actualTimeTaken
   } = useQuizSession(lessonId);
 
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
@@ -24,10 +24,16 @@ export default function QuizPage() {
     if (isFinished) {
       // Pass state via navigate
       navigate('/result', { 
-        state: { lessonId }
+        state: { 
+          lessonId,
+          score,
+          total: questions.length,
+          actualTimeTaken,
+          userAnswers
+        }
       });
     }
-  }, [isFinished, navigate, lessonId]);
+  }, [isFinished, navigate, lessonId, score, questions.length, actualTimeTaken, userAnswers]);
 
   if (!questions || questions.length === 0) {
     return (

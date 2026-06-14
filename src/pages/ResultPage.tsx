@@ -14,15 +14,14 @@ export default function ResultPage() {
   
   const [xpAwarded, setXpAwarded] = useState(false);
 
-  // We should ideally pass the result state via location.state from QuizPage
-  // However, since useQuizSession state is lost on unmount if we don't lift it,
-  // For the sake of this rewrite, let's assume the session logic stores result in localStorage or we just mock a result if we don't have it in state
-  // In a full app, the QuizContext or a global store would hold the result
+  const state = location.state || {};
+  const { lessonId, score = 0, actualTimeTaken = 0, userAnswers = {} } = state;
+  const total = 10; // Score is out of 10
+
+  const timeTakenMinutes = Math.floor(actualTimeTaken / 60);
+  const timeTakenSeconds = actualTimeTaken % 60;
+  const timeTaken = `${timeTakenMinutes.toString().padStart(2, '0')}:${timeTakenSeconds.toString().padStart(2, '0')}`;
   
-  // MOCK result for now if not provided
-  const score = 8;
-  const total = 10;
-  const timeTaken = "05:20";
   const xpReward = score * 5;
 
   useEffect(() => {
@@ -78,7 +77,7 @@ export default function ResultPage() {
 
         <div className="w-full space-y-3 mt-auto">
           <button 
-            onClick={() => navigate('/solutions')}
+            onClick={() => navigate('/solutions', { state: { lessonId, userAnswers } })}
             className="w-full bg-white border-2 border-slate-200 text-slate-700 font-display font-bold py-4 rounded-[20px] tactile-card hover:bg-slate-50 active:scale-95 transition-all flex justify-center items-center gap-2"
           >
             <span className="material-symbols-outlined text-lg">fact_check</span>

@@ -1,19 +1,17 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../contexts/AppContext';
 import SolutionItem from '../components/quiz/SolutionItem';
 
 export default function SolutionsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { quizzes } = useAppContext();
 
-  // Mocking user answers for the sake of the rewrite since we didn't persist quiz session
-  const mockUserAnswers: Record<string, string> = {};
-  quizzes.slice(0, 5).forEach((q, i) => {
-    mockUserAnswers[q.id] = i % 2 === 0 ? q.correctKey : (q.correctKey === 'A' ? 'B' : 'A');
-  });
+  const state = location.state || {};
+  const { lessonId, userAnswers = {} } = state;
 
-  const displayQuizzes = quizzes.slice(0, 5);
+  const displayQuizzes = lessonId ? quizzes.filter(q => q.lessonId === lessonId) : [];
 
   return (
     <div className="flex flex-col h-full bg-[#f7f9fb]">
@@ -26,14 +24,18 @@ export default function SolutionsPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
-        {displayQuizzes.map((q, idx) => (
-          <SolutionItem 
-            key={q.id}
-            question={q}
-            userAnswer={mockUserAnswers[q.id] || 'A'}
-            index={idx}
-          />
-        ))}
+        {displayQuizzes.length > 0 ? (
+          displayQuizzes.map((q, idx) => (
+            <SolutionItem 
+              key={q.id}
+              question={q}
+              userAnswer={userAnswers[q.id] || null}
+              index={idx}
+            />
+          ))
+        ) : (
+          <div className="text-center text-slate-500 mt-10">Không có dữ liệu bài kiểm tra.</div>
+        )}
         <div className="h-20"></div>
       </div>
     </div>

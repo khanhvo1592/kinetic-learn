@@ -3,7 +3,7 @@ import { QuizQuestion } from '../../types';
 
 interface SolutionItemProps {
   key?: React.Key; question: QuizQuestion;
-  userAnswer: string;
+  userAnswer: string | null;
   index: number;
 }
 
