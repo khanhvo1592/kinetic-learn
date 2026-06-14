@@ -1,0 +1,113 @@
+{
+  "entities": {
+    "Subject": {
+      "title": "Subject",
+      "description": "Represents an academic subject in the platform.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Subject unique ID (e.g., math, chemistry, physics)." },
+        "name": { "type": "string", "description": "Subject readable title." },
+        "icon": { "type": "string", "description": "Material Icon or Lucide icon name." },
+        "color": { "type": "string", "description": "Subject visual design color hex or color name." },
+        "bgColor": { "type": "string", "description": "Subject badge background visual state color." },
+        "borderColor": { "type": "string", "description": "Subject badge border theme color." },
+        "lessonsCount": { "type": "integer", "description": "Total lessons count." },
+        "exercisesCount": { "type": "integer", "description": "Total exercises/quizzes count in the bank." }
+      },
+      "required": ["id", "name", "lessonsCount", "exercisesCount"]
+    },
+    "Lesson": {
+      "title": "Lesson",
+      "description": "Represents a lecture chapter within a subject with educational summaries and formula cards.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique lesson ID." },
+        "subjectId": { "type": "string", "description": "The matching subject ID reference." },
+        "subjectName": { "type": "string", "description": "Read-only copy of of the parent subject's name." },
+        "title": { "type": "string", "description": "Title of the lesson." },
+        "chapter": { "type": "string", "description": "Chapter grouping label." },
+        "progress": { "type": "integer", "description": "Overall student completion of the lesson (0-100)." },
+        "duration": { "type": "string", "description": "Reading text completion estimate duration." },
+        "lastStudied": { "type": "string", "description": "ISO timestamp indicating when last read." },
+        "iconBg": { "type": "string", "description": "Vibrant visual accent bg." },
+        "iconColor": { "type": "string", "description": "Icon graphic color choice." },
+        "iconName": { "type": "string", "description": "Lucide icon keyword." },
+        "videoUrl": { "type": "string", "description": "Optional YouTube/Vimeo learn video link." },
+        "summary": { "type": "string", "description": "Comprehensive HTML/Markdown text explanation of study contents." },
+        "formulaTitle": { "type": "string", "description": "Short heading of formulas showcase block." },
+        "formulas": { "type": "array", "description": "List of core mathematical or chemical equations." }
+      },
+      "required": ["id", "subjectId", "title", "chapter", "progress", "summary"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "A specific practice task or objective for a student to accomplish with associated rewards.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique task ID." },
+        "title": { "type": "string", "description": "Readable description of task requirement." },
+        "category": { "type": "string", "description": "Parent grouping category/course name." },
+        "subInfo": { "type": "string", "description": "Detailing status info or instructions." },
+        "xpReward": { "type": "integer", "description": "Experience points granted on completion." },
+        "completed": { "type": "boolean", "description": "Indicator of whether the action is fully registered." },
+        "completedTime": { "type": "string", "description": "ISO completion timestamp." }
+      },
+      "required": ["id", "title", "completed", "xpReward"]
+    },
+    "QuizQuestion": {
+      "title": "QuizQuestion",
+      "description": "A single multiple choice quiz question inside the question bank.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique question ID." },
+        "num": { "type": "string", "description": "Two-decimal numbered label, e.g. '01'." },
+        "subjectId": { "type": "string", "description": "The matching subject ID code." },
+        "question": { "type": "string", "description": "The raw question text content." },
+        "options": { "type": "array", "description": "Options list including correct and decoy entries." },
+        "correctKey": { "type": "string", "description": "Core matching character answer, e.g., 'A'." },
+        "explanation": { "type": "string", "description": "A detailed solution brief explaining why this answer stands out." }
+      },
+      "required": ["id", "num", "question", "options", "correctKey", "explanation"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "A registered member profile with points trackers, active status, streaks, and system authorizations.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Matching system security user UID." },
+        "name": { "type": "string", "description": "Display name of the user." },
+        "username": { "type": "string", "description": "Public unique username alias." },
+        "avatar": { "type": "string", "description": "Profile picture URL." },
+        "xp": { "type": "integer", "description": "Cumulative score reward metrics." },
+        "streak": { "type": "integer", "description": "Consecutive days returning to keep daily streak." },
+        "role": { "type": "string", "description": "Role string values: student, admin." },
+        "status": { "type": "string", "description": "Account visual status: active or suspended." },
+        "email": { "type": "string", "description": "Mandatory unique email of the user (highly secured PII)." },
+        "createdAt": { "type": "string", "description": "Date registration occurred." }
+      },
+      "required": ["id", "name", "email", "xp", "streak", "role", "status"]
+    }
+  },
+  "firestore": {
+    "subjects": {
+      "schema": "Subject",
+      "description": "Academic subjects list available in Kinetic Academy."
+    },
+    "lessons": {
+      "schema": "Lesson",
+      "description": "Lecture notes and chapters linked to specific subjects."
+    },
+    "tasks": {
+      "schema": "Task",
+      "description": "Standard daily tasks tracked per-user to keep progress and streak on track."
+    },
+    "quizzes": {
+      "schema": "QuizQuestion",
+      "description": "Entire structured question bank synced per subject."
+    },
+    "students": {
+      "schema": "Student",
+      "description": "Highly guarded student registration profiles containing details, ranking score metrics and experience."
+    }
+  }
+}

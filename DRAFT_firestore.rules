@@ -1,0 +1,158 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL HELPER FUNCTIONS ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerificationAided() {
+      // Allow fallback if user authentication properties check out safely
+      return request.auth.token.email != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isAdmin() {
+      // Admin lookup from the verified student records
+      return isSignedIn() && (
+        request.auth.token.email == 'weblemyhotel@gmail.com' || (
+          exists(/databases/$(database)/documents/students/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/students/$(request.auth.uid)).data.role == 'admin'
+        )
+      );
+    }
+
+    // --- STUDENT VALIDATION ---
+    function isValidStudent(student) {
+      return student.id is string && student.id.size() <= 128
+        && student.name is string && student.name.size() <= 100
+        && student.username is string && student.username.size() <= 50
+        && student.avatar is string && student.avatar.size() <= 500
+        && student.xp is int && student.xp >= 0
+        && student.streak is int && student.streak >= 0
+        && (student.role == 'student' || student.role == 'admin')
+        && (student.status == 'active' || student.status == 'suspended')
+        && student.email is string && student.email.size() <= 150
+        && student.createdAt is string;
+    }
+
+    // --- SUBJECT VALIDATION ---
+    function isValidSubject(subject) {
+      return subject.id is string && subject.id.size() <= 128
+        && subject.name is string && subject.name.size() <= 100
+        && subject.icon is string && subject.icon.size() <= 100
+        && subject.color is string && subject.color.size() <= 100
+        && subject.bgColor is string && subject.bgColor.size() <= 100
+        && subject.borderColor is string && subject.borderColor.size() <= 100
+        && subject.lessonsCount is int && subject.lessonsCount >= 0
+        && subject.exercisesCount is int && subject.exercisesCount >= 0;
+    }
+
+    // --- LESSON VALIDATION ---
+    function isValidLesson(lesson) {
+      return lesson.id is string && lesson.id.size() <= 128
+        && lesson.subjectId is string && lesson.subjectId.size() <= 128
+        && lesson.subjectName is string && lesson.subjectName.size() <= 100
+        && lesson.title is string && lesson.title.size() <= 200
+        && lesson.chapter is string && lesson.chapter.size() <= 100
+        && lesson.progress is int && lesson.progress >= 0 && lesson.progress <= 100
+        && lesson.duration is string && lesson.duration.size() <= 50
+        && lesson.lastStudied is string
+        && lesson.iconBg is string && lesson.iconBg.size() <= 100
+        && lesson.iconColor is string && lesson.iconColor.size() <= 100
+        && lesson.iconName is string && lesson.iconName.size() <= 100
+        && lesson.summary is string && lesson.summary.size() <= 50000;
+    }
+
+    // --- TASK VALIDATION ---
+    function isValidTask(task) {
+      return task.id is string && task.id.size() <= 128
+        && task.userId is string && task.userId.size() <= 128
+        && task.title is string && task.title.size() <= 300
+        && task.category is string && task.category.size() <= 100
+        && task.subInfo is string && task.subInfo.size() <= 200
+        && task.xpReward is int && task.xpReward >= 0
+        && task.completed is bool;
+    }
+
+    // --- QUIZ QUESTIONS VALIDATION ---
+    function isValidQuizQuestion(quiz) {
+      return quiz.id is string && quiz.id.size() <= 128
+        && quiz.num is string && quiz.num.size() <= 3
+        && quiz.question is string && quiz.question.size() <= 2000
+        && quiz.options is list && quiz.options.size() >= 2 && quiz.options.size() <= 10
+        && quiz.correctKey is string && quiz.correctKey.size() <= 2
+        && quiz.explanation is string && quiz.explanation.size() <= 5000;
+    }
+
+    // ================= RULES PER PATH =================
+
+    // 1. STUDENTS COLLECTION
+    match /students/{studentId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isOwner(studentId) 
+                    && isValidStudent(request.resource.data) 
+                    && (request.resource.data.role == 'student' || (request.resource.data.role == 'admin' && request.auth.token.email == 'weblemyhotel@gmail.com'))
+                    && request.resource.data.status == 'active';
+      allow update: if isSignedIn() && (
+        (isOwner(studentId) 
+          && isValidStudent(request.resource.data)
+          && request.resource.data.role == resource.data.role 
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'username', 'avatar', 'xp', 'streak']))
+        || isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 2. SUBJECTS COLLECTION
+    match /subjects/{subjectId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // 3. LESSONS COLLECTION
+    match /lessons/{lessonId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // 4. QUIZZES COLLECTION
+    match /quizzes/{quizId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // 5. TASKS COLLECTION (User-specific collection)
+    match /tasks/{taskId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && (request.resource.data.userId == request.auth.uid) 
+                    && isValidTask(request.resource.data);
+      allow update: if isSignedIn() && (
+        (resource.data.userId == request.auth.uid 
+          && request.resource.data.userId == request.auth.uid 
+          && isValidTask(request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['completed', 'completedTime']))
+        || isAdmin()
+      );
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+  }
+}

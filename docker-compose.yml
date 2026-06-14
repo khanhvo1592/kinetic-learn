@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  kinetic-learning:
+    build: .
+    container_name: kinetic-learning-app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      # Điền Gemini API Key thật của bạn vào bên dưới:
+      - GEMINI_API_KEY=YOUR_GEMINI_API_KEY_HERE
+      - NODE_ENV=production
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
