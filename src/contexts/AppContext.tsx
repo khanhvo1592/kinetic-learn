@@ -22,6 +22,9 @@ interface AppContextType {
   deleteSubject: (id: string) => Promise<void>;
   deleteLesson: (id: string) => Promise<void>;
   addQuiz: (quiz: QuizQuestion) => Promise<void>;
+  updateQuiz: (quiz: QuizQuestion) => Promise<void>;
+  deleteQuiz: (id: string) => Promise<void>;
+  updateLesson: (lesson: Lesson) => Promise<void>;
   updateStudent: (student: Student) => Promise<void>;
   deleteStudent: (id: string) => Promise<void>;
 }
@@ -141,6 +144,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     refreshAll();
   }, [refreshAll]);
 
+  const updateLesson = useCallback(async (lesson: Lesson) => {
+    await setDoc(doc(db, 'lessons', lesson.id), lesson);
+    refreshAll();
+  }, [refreshAll]);
+
+
   const addQuiz = useCallback(async (quiz: QuizQuestion) => {
     await setDoc(doc(db, 'quizzes', quiz.id), quiz);
     setQuizzes(prev => [...prev, quiz]);
@@ -153,6 +162,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     }
   }, [subjects]);
+
+  const updateQuiz = useCallback(async (quiz: QuizQuestion) => {
+    await setDoc(doc(db, 'quizzes', quiz.id), quiz);
+    setQuizzes(prev => prev.map(q => q.id === quiz.id ? quiz : q));
+  }, []);
+
+  const deleteQuiz = useCallback(async (id: string) => {
+    await deleteDoc(doc(db, 'quizzes', id));
+    setQuizzes(prev => prev.filter(q => q.id !== id));
+  }, []);
+
 
   const updateStudent = useCallback(async (student: Student) => {
     await setDoc(doc(db, 'students', student.id), student);
@@ -167,7 +187,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   return (
     <AppContext.Provider value={{
       subjects, lessons, quizzes, allStudents, isDataLoading,
-      refreshAll, addSubject, addLesson, deleteSubject, deleteLesson, addQuiz, updateStudent, deleteStudent,
+      refreshAll, addSubject, addLesson, deleteSubject, deleteLesson, 
+      addQuiz, updateQuiz, deleteQuiz, updateLesson, 
+      updateStudent, deleteStudent,
     }}>
       {children}
     </AppContext.Provider>

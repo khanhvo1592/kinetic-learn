@@ -11,13 +11,14 @@ export default function AdminPage() {
     addSubject: onAddSubject, addLesson: onAddLesson, 
     addQuiz: onAddQuiz, updateStudent: onUpdateStudent, 
     deleteStudent: onDeleteStudent,
-    deleteSubject, deleteLesson
+    deleteSubject, deleteLesson,
+    updateLesson: onUpdateLesson, updateQuiz: onUpdateQuiz, deleteQuiz
   } = useAppContext();
   const onAddStudent = onUpdateStudent;
   const { isAdmin } = useAuth();
   
   // Tabs: 'subject' | 'lesson' | 'quiz' | 'students'
-  const [activeTab, setActiveTab] = useState<'subject' | 'lesson' | 'quiz' | 'students'>(isAdmin ? 'students' : 'subject');
+  const [activeTab, setActiveTab] = useState<'subject' | 'lesson' | 'quiz' | 'students'>(isAdmin ? 'students' : 'lesson');
   const [successMsg, setSuccessMsg] = useState('');
 
   // 1. Subject Form States
@@ -33,6 +34,7 @@ export default function AdminPage() {
   const [lessonSummary, setLessonSummary] = useState('');
   const [formulaInput, setFormulaInput] = useState('');
   const [lessonSections, setLessonSections] = useState([{ title: '1. Khảo sát lý thuyết', content: '', type: 'text' as const }, { title: '2. Ví dụ áp dụng', content: '', type: 'text' as const }]);
+  const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
 
   // 3. Quiz Form States
   const [quizLessonId, setQuizLessonId] = useState(lessons[0]?.id || '');
@@ -45,6 +47,7 @@ export default function AdminPage() {
   const [explanation, setExplanation] = useState('');
   const [quizInputMode, setQuizInputMode] = useState<'single' | 'bulk'>('single');
   const [bulkQuizText, setBulkQuizText] = useState('');
+  const [editingQuizId, setEditingQuizId] = useState<string | null>(null);
 
   // 4. Student Management States
   const [searchStudent, setSearchStudent] = useState('');
@@ -94,26 +97,51 @@ export default function AdminPage() {
     if (!lessonTitle.trim()) return;
 
     const matchSubj = subjects.find(s => s.id === selectedSubjId);
-    const newLesson: Lesson = {
-      id: `lesson-${Date.now()}`,
-      subjectId: selectedSubjId,
-      subjectName: matchSubj ? matchSubj.name : 'Môn học mới',
-      title: lessonTitle.trim(),
-      chapter: lessonChapter.trim() || 'Chương 1',
-      progress: 0,
-      duration: '15 phút',
-      lastStudied: 'Chưa học',
-      iconBg: 'bg-amber-100',
-      iconColor: 'text-amber-600',
-      iconName: 'menu_book',
-      summary: lessonSummary.trim() || 'Tóm tắt bài học mới cập nhật từ giáo viên.',
-      formulaTitle: formulaInput ? 'CÔNG THỨC CHỦ CHỐT' : undefined,
-      formulas: formulaInput ? [formulaInput] : undefined,
-      sections: lessonSections.map(s => ({ ...s, content: s.content || 'Nội dung trống.' }))
-    };
+    
+    if (editingLessonId) {
+      const existing = lessons.find(l => l.id === editingLessonId);
+      if (existing) {
+        const updatedLesson: Lesson = {
+          ...existing,
+          subjectId: selectedSubjId,
+          subjectName: matchSubj ? matchSubj.name : existing.subjectName,
+          title: lessonTitle.trim(),
+          chapter: lessonChapter.trim() || 'Chương 1',
+          summary: lessonSummary.trim() || 'Tóm tắt bài học mới cập nhật từ giáo viên.',
+          formulaTitle: formulaInput ? 'CÔNG THỨC CHỦ CHỐT' : undefined,
+          formulas: formulaInput ? [formulaInput] : undefined,
+          sections: lessonSections.map(s => ({ ...s, content: s.content || 'Nội dung trống.' }))
+        };
+        onUpdateLesson(updatedLesson);
+        triggerToast(`Đã cập nhật bài học: "${lessonTitle}"`);
+      }
+    } else {
+      const newLesson: Lesson = {
+        id: `lesson-${Date.now()}`,
+        subjectId: selectedSubjId,
+        subjectName: matchSubj ? matchSubj.name : 'Môn học mới',
+        title: lessonTitle.trim(),
+        chapter: lessonChapter.trim() || 'Chương 1',
+        progress: 0,
+        duration: '15 phút',
+        lastStudied: 'Chưa học',
+        iconBg: 'bg-amber-100',
+        iconColor: 'text-amber-600',
+        iconName: 'menu_book',
+        summary: lessonSummary.trim() || 'Tóm tắt bài học mới cập nhật từ giáo viên.',
+        formulaTitle: formulaInput ? 'CÔNG THỨC CHỦ CHỐT' : undefined,
+        formulas: formulaInput ? [formulaInput] : undefined,
+        sections: lessonSections.map(s => ({ ...s, content: s.content || 'Nội dung trống.' }))
+      };
+      onAddLesson(newLesson);
+      triggerToast(`Đã thêm bài học mới: "${lessonTitle}"`);
+    }
 
-    onAddLesson(newLesson);
-    triggerToast(`Đã thêm bài học mới: "${lessonTitle}"`);
+    resetLessonForm();
+  };
+
+  const resetLessonForm = () => {
+    setEditingLessonId(null);
     setLessonTitle('');
     setLessonChapter('');
     setLessonSummary('');
@@ -121,27 +149,65 @@ export default function AdminPage() {
     setLessonSections([{ title: '', content: '', type: 'text' }]);
   };
 
+  const startEditLesson = (lesson: Lesson) => {
+    setEditingLessonId(lesson.id);
+    setSelectedSubjId(lesson.subjectId);
+    setLessonTitle(lesson.title);
+    setLessonChapter(lesson.chapter);
+    setLessonSummary(lesson.summary || '');
+    setFormulaInput(lesson.formulas && lesson.formulas.length > 0 ? lesson.formulas[0] : '');
+    setLessonSections(lesson.sections && lesson.sections.length > 0 ? lesson.sections : [{ title: '1. Khảo sát lý thuyết', content: '', type: 'text' }]);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+
   const handleCreateQuiz = (e: React.FormEvent) => {
     e.preventDefault();
     if (!quizQuestion.trim() || !optA.trim() || !optB.trim()) return;
 
-    const newQuiz: QuizQuestion = {
-      id: `quiz-${Date.now()}`,
-      num: String(quizzes.length + 1).padStart(2, '0'),
-      lessonId: quizLessonId,
-      question: quizQuestion.trim(),
-      options: [
-        { key: 'A', text: optA.trim() },
-        { key: 'B', text: optB.trim() },
-        { key: 'C', text: optC.trim() || 'Khoảng trống' },
-        { key: 'D', text: optD.trim() || 'Khoảng trống' }
-      ],
-      correctKey: correctKey,
-      explanation: explanation.trim() || 'Lời giải chi tiết do giáo viên hệ thống biên soạn.'
-    };
+    if (editingQuizId) {
+      const existing = quizzes.find(q => q.id === editingQuizId);
+      if (existing) {
+        const updatedQuiz: QuizQuestion = {
+          ...existing,
+          lessonId: quizLessonId,
+          question: quizQuestion.trim(),
+          options: [
+            { key: 'A', text: optA.trim() },
+            { key: 'B', text: optB.trim() },
+            { key: 'C', text: optC.trim() || 'Khoảng trống' },
+            { key: 'D', text: optD.trim() || 'Khoảng trống' }
+          ],
+          correctKey: correctKey,
+          explanation: explanation.trim() || 'Lời giải chi tiết do giáo viên hệ thống biên soạn.'
+        };
+        onUpdateQuiz(updatedQuiz);
+        triggerToast(`Đã cập nhật câu trắc nghiệm!`);
+      }
+    } else {
+      const newQuiz: QuizQuestion = {
+        id: `quiz-${Date.now()}`,
+        num: String(quizzes.filter(q => q.lessonId === quizLessonId).length + 1).padStart(2, '0'),
+        lessonId: quizLessonId,
+        question: quizQuestion.trim(),
+        options: [
+          { key: 'A', text: optA.trim() },
+          { key: 'B', text: optB.trim() },
+          { key: 'C', text: optC.trim() || 'Khoảng trống' },
+          { key: 'D', text: optD.trim() || 'Khoảng trống' }
+        ],
+        correctKey: correctKey,
+        explanation: explanation.trim() || 'Lời giải chi tiết do giáo viên hệ thống biên soạn.'
+      };
+      onAddQuiz(newQuiz);
+      triggerToast(`Đã thêm thành công một câu trắc nghiệm mới!`);
+    }
+    
+    resetQuizForm();
+  };
 
-    onAddQuiz(newQuiz);
-    triggerToast(`Đã thêm thành công một câu trắc nghiệm mới!`);
+  const resetQuizForm = () => {
+    setEditingQuizId(null);
     setQuizQuestion('');
     setOptA('');
     setOptB('');
@@ -149,6 +215,21 @@ export default function AdminPage() {
     setOptD('');
     setExplanation('');
   };
+
+  const startEditQuiz = (quiz: QuizQuestion) => {
+    setEditingQuizId(quiz.id);
+    setQuizLessonId(quiz.lessonId);
+    setQuizQuestion(quiz.question);
+    setOptA(quiz.options.find(o => o.key === 'A')?.text || '');
+    setOptB(quiz.options.find(o => o.key === 'B')?.text || '');
+    setOptC(quiz.options.find(o => o.key === 'C')?.text || '');
+    setOptD(quiz.options.find(o => o.key === 'D')?.text || '');
+    setCorrectKey(quiz.correctKey);
+    setExplanation(quiz.explanation || '');
+    setQuizInputMode('single');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
 
   const handleBulkCreateQuiz = () => {
     if (!bulkQuizText.trim()) return;
@@ -1003,12 +1084,25 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              <button
-                type="submit"
-                className="w-full h-11 bg-[#0058be] text-white font-display font-bold rounded-xl shadow-[0_4px_0_0_#004395] hover:bg-blue-700 active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                Thêm bài học mới <span className="material-symbols-outlined text-sm">menu_book</span>
-              </button>
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="submit"
+                  className="flex-1 h-11 bg-[#0058be] text-white font-display font-bold rounded-xl shadow-[0_4px_0_0_#004395] hover:bg-blue-700 active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {editingLessonId ? 'Lưu thay đổi' : 'Thêm bài học mới'}
+                  <span className="material-symbols-outlined text-sm">{editingLessonId ? 'save' : 'menu_book'}</span>
+                </button>
+                {editingLessonId && (
+                  <button
+                    type="button"
+                    onClick={resetLessonForm}
+                    className="flex-1 h-11 bg-slate-200 text-slate-700 font-display font-bold rounded-xl shadow-[0_4px_0_0_#cbd5e1] hover:bg-slate-300 active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    Hủy chỉnh sửa
+                    <span className="material-symbols-outlined text-sm">cancel</span>
+                  </button>
+                )}
+              </div>
 
               <div className="mt-8 pt-6 border-t-2 border-slate-100">
                 <h4 className="font-display font-bold text-sm text-slate-800 mb-4">Danh sách Bài học hiện tại</h4>
@@ -1038,23 +1132,33 @@ export default function AdminPage() {
                                     <span className="font-bold text-slate-700 text-sm leading-tight">{l.title}</span>
                                     <span className="text-[10px] text-slate-400 font-sans truncate max-w-[200px]">{l.summary}</span>
                                   </div>
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      if (window.confirm(`Bạn có chắc chắn muốn xóa bài học "${l.title}" không?`)) {
-                                        try {
-                                          await deleteLesson(l.id);
-                                          triggerToast(`Đã xóa thành công bài học ${l.title}`);
-                                        } catch (error: any) {
-                                          console.error(error);
-                                          alert(`Lỗi khi xóa bài học: ${error.message}`);
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => startEditLesson(l)}
+                                      title="Chỉnh sửa bài học"
+                                      className="text-blue-500 hover:bg-blue-50 p-2 rounded-lg transition-colors cursor-pointer"
+                                    >
+                                      <span className="material-symbols-outlined text-base block">edit</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        if (window.confirm(`Bạn có chắc chắn muốn xóa bài học "${l.title}" không?`)) {
+                                          try {
+                                            await deleteLesson(l.id);
+                                            triggerToast(`Đã xóa thành công bài học ${l.title}`);
+                                          } catch (error: any) {
+                                            console.error(error);
+                                            alert(`Lỗi khi xóa bài học: ${error.message}`);
+                                          }
                                         }
-                                      }
-                                    }}
-                                    className="text-red-400 hover:bg-red-50 hover:text-red-600 p-1.5 rounded-md shrink-0 transition-colors"
-                                  >
+                                      }}
+                                      className="text-red-400 hover:bg-red-50 hover:text-red-600 p-1.5 rounded-md shrink-0 transition-colors"
+                                    >
                                     <span className="material-symbols-outlined text-base block">delete</span>
                                   </button>
+                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -1070,6 +1174,7 @@ export default function AdminPage() {
 
           {/* TAB 3: CREATE QUIZ FORM */}
           {activeTab === 'quiz' && (
+            <>
             <form onSubmit={handleCreateQuiz} className="space-y-4 font-sans text-xs">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
@@ -1092,22 +1197,24 @@ export default function AdminPage() {
               </div>
 
               {/* Toggle Input Mode */}
-              <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
-                <button
-                  type="button"
-                  onClick={() => setQuizInputMode('single')}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${quizInputMode === 'single' ? 'bg-white text-[#0058be] shadow-sm' : 'text-slate-500'}`}
-                >
-                  Soạn từng câu
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setQuizInputMode('bulk')}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${quizInputMode === 'bulk' ? 'bg-white text-[#0058be] shadow-sm' : 'text-slate-500'}`}
-                >
-                  Soạn hàng loạt
-                </button>
-              </div>
+              {!editingQuizId && (
+                <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
+                  <button
+                    type="button"
+                    onClick={() => setQuizInputMode('single')}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${quizInputMode === 'single' ? 'bg-white text-[#0058be] shadow-sm' : 'text-slate-500'}`}
+                  >
+                    Soạn từng câu
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuizInputMode('bulk')}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${quizInputMode === 'bulk' ? 'bg-white text-[#0058be] shadow-sm' : 'text-slate-500'}`}
+                  >
+                    Soạn hàng loạt
+                  </button>
+                </div>
+              )}
 
               {quizInputMode === 'single' ? (
                 <>
@@ -1198,12 +1305,25 @@ export default function AdminPage() {
                 </div>
               </div>
 
-                <button
-                  type="submit"
-                  className="w-full h-11 bg-purple-600 text-white font-display font-bold rounded-xl shadow-[0_4px_0_0_#5516be] hover:bg-purple-700 active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  Thêm trắc nghiệm mới <span className="material-symbols-outlined text-sm">quiz</span>
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    type="submit"
+                    className="flex-1 h-11 bg-purple-600 text-white font-display font-bold rounded-xl shadow-[0_4px_0_0_#5516be] hover:bg-purple-700 active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {editingQuizId ? 'Lưu thay đổi' : 'Thêm trắc nghiệm mới'} 
+                    <span className="material-symbols-outlined text-sm">{editingQuizId ? 'save' : 'quiz'}</span>
+                  </button>
+                  {editingQuizId && (
+                    <button
+                      type="button"
+                      onClick={resetQuizForm}
+                      className="flex-1 h-11 bg-slate-200 text-slate-700 font-display font-bold rounded-xl shadow-[0_4px_0_0_#cbd5e1] hover:bg-slate-300 active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      Hủy chỉnh sửa
+                      <span className="material-symbols-outlined text-sm">cancel</span>
+                    </button>
+                  )}
+                </div>
               </>
             ) : (
               <div className="space-y-4">
@@ -1237,6 +1357,64 @@ export default function AdminPage() {
               </div>
             )}
             </form>
+
+            {/* Quiz List */}
+            <div className="mt-8 pt-6 border-t-2 border-slate-100">
+              <h4 className="font-display font-bold text-sm text-slate-800 mb-4">Danh sách Trắc nghiệm hiện tại</h4>
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 scroll-hide">
+                {(() => {
+                  const filteredQuizzes = quizzes.filter(q => q.lessonId === quizLessonId);
+                  
+                  if (filteredQuizzes.length === 0) return <p className="text-slate-400 italic text-center">Chưa có câu hỏi trắc nghiệm nào cho bài học này.</p>;
+
+                  return filteredQuizzes.map((q, idx) => (
+                    <div key={q.id} className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm space-y-3">
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex-1">
+                          <span className="font-bold text-[#0058be] mr-2">Câu {idx + 1}:</span>
+                          <span className="font-semibold text-slate-700 text-sm leading-relaxed">{q.question}</span>
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => startEditQuiz(q)}
+                            title="Chỉnh sửa câu hỏi"
+                            className="text-blue-500 hover:bg-blue-50 p-2 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-base block">edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (window.confirm('Bạn có chắc chắn muốn xóa câu hỏi này không?')) {
+                                try {
+                                  await deleteQuiz(q.id);
+                                  triggerToast('Đã xóa thành công câu hỏi trắc nghiệm');
+                                } catch (error: any) {
+                                  console.error(error);
+                                  alert(`Lỗi khi xóa câu hỏi: ${error.message}`);
+                                }
+                              }
+                            }}
+                            className="text-red-400 hover:bg-red-50 hover:text-red-600 p-2 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-base block">delete</span>
+                          </button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        {q.options.map(opt => (
+                          <div key={opt.key} className={`p-2 border rounded-lg ${opt.key === q.correctKey ? 'bg-emerald-50 border-emerald-200 font-bold text-emerald-800' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
+                            {opt.key}. {opt.text}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+            </>
           )}
 
         </div>
