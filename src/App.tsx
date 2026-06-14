@@ -17,6 +17,7 @@ import LessonPage from './pages/LessonPage';
 import QuizPage from './pages/QuizPage';
 import ResultPage from './pages/ResultPage';
 import SolutionsPage from './pages/SolutionsPage';
+import ExamPage from './pages/ExamPage';
 
 // Auth Guard
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -76,6 +77,11 @@ export default function App() {
             <Route path="/solutions" element={
               <RequireAuth>
                 <SolutionsPage />
+              </RequireAuth>
+            } />
+            <Route path="/exam" element={
+              <RequireAuth>
+                <ExamPage />
               </RequireAuth>
             } />
             

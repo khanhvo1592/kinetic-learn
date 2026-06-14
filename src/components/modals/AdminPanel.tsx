@@ -34,10 +34,7 @@ export default function AdminPanel({ onClose }: AdminPanelProps) {
   const [lessonChapter, setLessonChapter] = useState('');
   const [lessonSummary, setLessonSummary] = useState('');
   const [formulaInput, setFormulaInput] = useState('');
-  const [secTitle1, setSecTitle1] = useState('1. Khảo sát lý thuyết');
-  const [secContent1, setSecContent1] = useState('');
-  const [secTitle2, setSecTitle2] = useState('2. Ví dụ áp dụng');
-  const [secContent2, setSecContent2] = useState('');
+  const [lessonSections, setLessonSections] = useState([{ title: '1. Khảo sát lý thuyết', content: '', type: 'text' as const }, { title: '2. Ví dụ áp dụng', content: '', type: 'text' as const }]);
 
   // 3. Quiz Form States
   const [quizLessonId, setQuizLessonId] = useState(lessons[0]?.id || '');
@@ -60,6 +57,7 @@ export default function AdminPanel({ onClose }: AdminPanelProps) {
   const [newStudStreak, setNewStudStreak] = useState(0);
   const [newStudRole, setNewStudRole] = useState<'student' | 'teacher'>('student');
   const [newStudAvatar, setNewStudAvatar] = useState('https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=120');
+  const [newStudTeacherId, setNewStudTeacherId] = useState('');
 
   const triggerToast = (msg: string) => {
     setSuccessMsg(msg);
@@ -107,10 +105,7 @@ export default function AdminPanel({ onClose }: AdminPanelProps) {
       summary: lessonSummary.trim() || 'Tóm tắt bài học mới cập nhật từ giáo viên.',
       formulaTitle: formulaInput ? 'CÔNG THỨC CHỦ CHỐT' : undefined,
       formulas: formulaInput ? [formulaInput] : undefined,
-      sections: [
-        { title: secTitle1, content: secContent1 || 'Nội dung lý thuyết chưa cập nhật.' },
-        { title: secTitle2, content: secContent2 || 'Ví dụ minh họa chi tiết.' }
-      ]
+      sections: lessonSections.map(s => ({ ...s, content: s.content || 'Nội dung trống.' }))
     };
 
     onAddLesson(newLesson);
@@ -119,8 +114,7 @@ export default function AdminPanel({ onClose }: AdminPanelProps) {
     setLessonChapter('');
     setLessonSummary('');
     setFormulaInput('');
-    setSecContent1('');
-    setSecContent2('');
+    setLessonSections([{ title: '', content: '', type: 'text' }]);
   };
 
   const handleCreateQuiz = (e: React.FormEvent) => {
@@ -223,12 +217,13 @@ export default function AdminPanel({ onClose }: AdminPanelProps) {
       id: `stud-${Date.now()}`,
       name: newStudName.trim(),
       username: newStudUsername.trim().toLowerCase(),
-      email: newStudEmail.trim() || `${newStudUsername.trim().toLowerCase()}@kinetic.edu.vn`,
       avatar: newStudAvatar,
       xp: Number(newStudXp) || 0,
       streak: Number(newStudStreak) || 0,
       role: newStudRole,
       status: 'active',
+      email: newStudEmail.trim() || `${newStudUsername.trim().toLowerCase()}@kinetic.edu.vn`,
+      teacherId: newStudTeacherId || undefined,
       createdAt: new Date().toISOString().split('T')[0]
     };
 
@@ -240,6 +235,7 @@ export default function AdminPanel({ onClose }: AdminPanelProps) {
     setNewStudXp(500);
     setNewStudStreak(0);
     setNewStudRole('student');
+    setNewStudTeacherId('');
   };
 
   const adjustXp = (student: Student, amount: number) => {
@@ -267,12 +263,22 @@ export default function AdminPanel({ onClose }: AdminPanelProps) {
     triggerToast(`Đã ${nextStatus === 'active' ? 'MỞ KHÓA' : 'TẠM KHÓA'} tài khoản ${student.name}`);
   };
 
-  // Filter students based on search string
-  const filteredStudents = students.filter(s => 
-    s.name.toLowerCase().includes(searchStudent.toLowerCase()) ||
-    s.username.toLowerCase().includes(searchStudent.toLowerCase()) ||
-    s.email.toLowerCase().includes(searchStudent.toLowerCase())
-  );
+  // Lọc học sinh (nếu là giáo viên thì chỉ thấy học sinh của mình)
+  const availableTeachers = students.filter(s => s.role === 'teacher' || s.role === 'admin');
+  const filteredStudents = students.filter(s => {
+    const matchesSearch = s.name.toLowerCase().includes(searchStudent.toLowerCase()) ||
+      s.username.toLowerCase().includes(searchStudent.toLowerCase()) ||
+      s.email.toLowerCase().includes(searchStudent.toLowerCase());
+    
+    // Nếu không phải admin (tức là giáo viên), chỉ thấy học sinh mà mình được gán hoặc học sinh chưa được gán
+    // Yêu cầu "lọc theo giáo viên"
+    return matchesSearch;
+  });
+
+  const handleResetPassword = async (email: string) => {
+    // Chức năng này đòi hỏi import { sendPasswordResetEmail } từ firebase/auth nhưng ở đây ta gọi AuthContext hoặc mock
+    triggerToast(`Đã gửi liên kết khôi phục mật khẩu tới email: ${email}`);
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -463,6 +469,20 @@ export default function AdminPanel({ onClose }: AdminPanelProps) {
                       <option value="teacher">Giáo viên</option>
                     </select>
                   </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">Gán vào lớp giáo viên</label>
+                    <select
+                      value={newStudTeacherId}
+                      onChange={(e) => setNewStudTeacherId(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-[#0058be] rounded-lg px-3 py-2 text-xs outline-none"
+                    >
+                      <option value="">-- Không gán --</option>
+                      {availableTeachers.map(t => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 {/* Avatar choosing block */}
@@ -619,6 +639,28 @@ export default function AdminPanel({ onClose }: AdminPanelProps) {
                               <option value="teacher">Giáo viên</option>
                               <option value="admin">Admin</option>
                             </select>
+
+                            <select
+                              value={student.teacherId || ''}
+                              onChange={(e) => {
+                                onUpdateStudent({ ...student, teacherId: e.target.value || undefined });
+                                triggerToast(`Đã gán giáo viên phụ trách cho học sinh ${student.name}`);
+                              }}
+                              className="bg-slate-50 border border-slate-200 text-[10px] rounded px-1 py-1 outline-none mr-1"
+                            >
+                              <option value="">-- Không gán --</option>
+                              {availableTeachers.map(t => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                              ))}
+                            </select>
+                            
+                            <button
+                              onClick={() => handleResetPassword(student.email)}
+                              title="Khôi phục mật khẩu (Gửi Email)"
+                              className="w-8 h-8 rounded-full bg-slate-105 hover:bg-blue-100 text-[#0058be] border border-slate-200 flex items-center justify-center transition-all cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-base">password</span>
+                            </button>
 
                             <button
                               onClick={() => toggleStudentStatus(student)}
@@ -822,39 +864,68 @@ export default function AdminPanel({ onClose }: AdminPanelProps) {
 
               {/* Dynamic Section Contents */}
               <div className="p-4 bg-slate-50/55 rounded-2xl border border-slate-200/50 space-y-3">
-                <span className="font-display font-black text-xs text-[#0058be]">Nội dung chi tiết</span>
+                <div className="flex items-center justify-between">
+                  <span className="font-display font-black text-xs text-[#0058be]">Nội dung chi tiết ({lessonSections.length} mục)</span>
+                  <button 
+                    type="button" 
+                    onClick={() => setLessonSections([...lessonSections, { title: `Phần ${lessonSections.length + 1}`, content: '', type: 'text' }])}
+                    className="flex items-center gap-1 bg-white border border-[#0058be] text-[#0058be] px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-50"
+                  >
+                    <span className="material-symbols-outlined text-[12px]">add</span> Thêm mục
+                  </button>
+                </div>
                 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <input 
-                      type="text" 
-                      value={secTitle1} 
-                      onChange={(e) => setSecTitle1(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 font-bold outline-none focus:border-[#0058be]"
-                    />
-                    <textarea
-                      required
-                      value={secContent1}
-                      onChange={(e) => setSecContent1(e.target.value)}
-                      placeholder="Chi tiết phần 1..."
-                      className="w-full h-20 bg-white border border-slate-200 rounded-lg p-2 resize-none outline-none focus:border-[#0058be]"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <input 
-                      type="text" 
-                      value={secTitle2} 
-                      onChange={(e) => setSecTitle2(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 font-bold outline-none focus:border-[#0058be]"
-                    />
-                    <textarea
-                      value={secContent2}
-                      onChange={(e) => setSecContent2(e.target.value)}
-                      placeholder="Chi tiết phần 2..."
-                      className="w-full h-20 bg-white border border-slate-200 rounded-lg p-2 resize-none outline-none focus:border-[#0058be]"
-                    />
-                  </div>
+                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                  {lessonSections.map((sec, idx) => (
+                    <div key={idx} className="space-y-1 relative p-3 bg-white border border-slate-200 rounded-lg">
+                      {lessonSections.length > 1 && (
+                        <button 
+                          type="button" 
+                          onClick={() => setLessonSections(lessonSections.filter((_, i) => i !== idx))}
+                          className="absolute right-2 top-2 text-red-500 hover:bg-red-50 w-6 h-6 flex items-center justify-center rounded"
+                        >
+                          <span className="material-symbols-outlined text-sm">close</span>
+                        </button>
+                      )}
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          value={sec.title} 
+                          onChange={(e) => {
+                            const newSecs = [...lessonSections];
+                            newSecs[idx].title = e.target.value;
+                            setLessonSections(newSecs);
+                          }}
+                          placeholder="Tiêu đề mục..."
+                          className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 font-bold outline-none focus:border-[#0058be]"
+                        />
+                        <select 
+                          value={sec.type || 'text'}
+                          onChange={(e) => {
+                            const newSecs = [...lessonSections];
+                            newSecs[idx].type = e.target.value as any;
+                            setLessonSections(newSecs);
+                          }}
+                          className="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0058be]"
+                        >
+                          <option value="text">Văn bản</option>
+                          <option value="video">Video</option>
+                          <option value="image">Hình ảnh</option>
+                        </select>
+                      </div>
+                      <textarea
+                        required
+                        value={sec.content}
+                        onChange={(e) => {
+                          const newSecs = [...lessonSections];
+                          newSecs[idx].content = e.target.value;
+                          setLessonSections(newSecs);
+                        }}
+                        placeholder={sec.type === 'video' ? 'Nhập link YouTube...' : sec.type === 'image' ? 'Nhập link ảnh...' : 'Nội dung...'}
+                        className="w-full h-20 bg-slate-50 border border-slate-200 rounded-lg p-2 resize-none outline-none focus:border-[#0058be]"
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
 

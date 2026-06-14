@@ -24,10 +24,10 @@ export default function QuizPage() {
     if (isFinished) {
       // Pass state via navigate
       navigate('/result', { 
-        state: { subjectId }
+        state: { lessonId }
       });
     }
-  }, [isFinished, navigate, subjectId]);
+  }, [isFinished, navigate, lessonId]);
 
   if (!questions || questions.length === 0) {
     return (

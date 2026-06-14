@@ -16,6 +16,7 @@ export interface Subject {
 export interface LessonSection {
   title: string;
   content: string;
+  type?: 'text' | 'video' | 'formula' | 'image';
 }
 
 export interface Lesson {
@@ -57,6 +58,7 @@ export interface QuizQuestion {
   id: string;
   num: string;
   lessonId?: string;
+  subjectId?: string;
   question: string;
   options: QuizOption[];
   correctKey: string;
@@ -81,6 +83,7 @@ export interface Student {
   status: 'active' | 'suspended';
   email: string;
   createdAt: string;
+  teacherId?: string;
 }
 
 export interface Discussion {

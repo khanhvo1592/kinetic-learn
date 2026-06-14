@@ -44,6 +44,12 @@ export default function HomePage() {
         <p className="text-sm opacity-80 font-sans">Chào buổi sáng 🌅</p>
         <h1 className="text-2xl font-display font-bold mt-1">{currentUser.name}!</h1>
         <p className="text-sm opacity-90 mt-2 font-sans">Sẵn sàng chinh phục kiến thức hôm nay chưa nào? 🚀</p>
+        <button 
+          onClick={() => navigate('/exam')} 
+          className="mt-4 px-6 py-2.5 bg-white text-[#0058be] font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2 w-fit active:scale-95"
+        >
+          <span className="material-symbols-outlined text-sm">quiz</span> Làm bài kiểm tra
+        </button>
         <div className="flex gap-4 mt-4">
           <div className="bg-white/20 backdrop-blur-sm rounded-2xl px-4 py-2 text-center">
             <p className="text-xs opacity-80">XP</p>
