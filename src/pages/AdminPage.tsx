@@ -54,7 +54,7 @@ export default function AdminPage() {
   const [newStudXp, setNewStudXp] = useState(500);
   const [newStudStreak, setNewStudStreak] = useState(0);
   const [newStudRole, setNewStudRole] = useState<'student' | 'teacher'>('student');
-  const [newStudAvatar, setNewStudAvatar] = useState('https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=120');
+  const [newStudPassword, setNewStudPassword] = useState(Math.random().toString(36).slice(-8));
   const [newStudTeacherId, setNewStudTeacherId] = useState('');
 
   const getYoutubeId = (url: string) => {
@@ -221,13 +221,14 @@ export default function AdminPage() {
       id: `stud-${Date.now()}`,
       name: newStudName.trim(),
       username: newStudUsername.trim().toLowerCase(),
-      avatar: newStudAvatar,
+      avatar: `https://api.dicebear.com/7.x/notionists/svg?seed=${newStudUsername.trim().toLowerCase()}`,
       xp: Number(newStudXp) || 0,
       streak: Number(newStudStreak) || 0,
       role: newStudRole,
       status: 'active',
       email: newStudEmail.trim() || `${newStudUsername.trim().toLowerCase()}@kinetic.edu.vn`,
       teacherId: newStudTeacherId || undefined,
+      password: newStudPassword.trim(),
       createdAt: new Date().toISOString().split('T')[0]
     };
 
@@ -240,6 +241,7 @@ export default function AdminPage() {
     setNewStudStreak(0);
     setNewStudRole('student');
     setNewStudTeacherId('');
+    setNewStudPassword(Math.random().toString(36).slice(-8));
   };
 
   const adjustXp = (student: Student, amount: number) => {
@@ -279,9 +281,15 @@ export default function AdminPage() {
     return matchesSearch;
   });
 
-  const handleResetPassword = async (email: string) => {
-    // Chức năng này đòi hỏi import { sendPasswordResetEmail } từ firebase/auth nhưng ở đây ta gọi AuthContext hoặc mock
-    triggerToast(`Đã gửi liên kết khôi phục mật khẩu tới email: ${email}`);
+  const handleResetPassword = async (student: Student) => {
+    const newPass = prompt(`Nhập mật khẩu mới cho tài khoản ${student.username}:`);
+    if (newPass && newPass.trim() !== '') {
+      onUpdateStudent({
+        ...student,
+        password: newPass.trim()
+      });
+      triggerToast(`Đã đổi mật khẩu thành công cho tài khoản ${student.username}`);
+    }
   };
 
   return (
@@ -492,32 +500,22 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {/* Avatar choosing block */}
+                {/* Password block */}
                 <div className="flex items-center gap-3">
-                  <span className="font-black text-slate-500">Chọn chân dung đại diện:</span>
-                  <div className="flex gap-2">
-                    {[
-                      'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=120',
-                      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=120',
-                      'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=120',
-                      'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&q=80&w=120'
-                    ].map(url => (
-                      <button
-                        type="button"
-                        key={url}
-                        onClick={() => setNewStudAvatar(url)}
-                        className={`w-10 h-10 rounded-full overflow-hidden border-2 transition-all cursor-pointer ${
-                          newStudAvatar === url ? 'border-[#0058be] scale-110 ring-2 ring-blue-100' : 'border-transparent'
-                        }`}
-                      >
-                        <img src={url} alt="Avatar Selection" className="w-full h-full object-cover" />
-                      </button>
-                    ))}
+                  <div className="space-y-1 flex-1">
+                    <label className="font-black text-slate-500">Mật khẩu ban đầu</label>
+                    <input
+                      type="text"
+                      required
+                      value={newStudPassword}
+                      onChange={(e) => setNewStudPassword(e.target.value)}
+                      className="w-full bg-white border border-slate-200 focus:border-[#0058be] rounded-lg px-2.5 py-2.5 text-xs outline-none font-mono"
+                    />
                   </div>
 
                   <button
                     type="submit"
-                    className="ml-auto bg-[#0058be] hover:bg-blue-700 text-white font-display font-black text-xs px-5 py-3 rounded-xl transition-all shadow-[0_3px_0_0_#004395] active:translate-y-[1px] active:shadow-none flex items-center gap-1.5 cursor-pointer"
+                    className="ml-auto bg-[#0058be] hover:bg-blue-700 text-white font-display font-black text-xs px-5 py-3 rounded-xl transition-all shadow-[0_3px_0_0_#004395] active:translate-y-[1px] active:shadow-none flex items-center gap-1.5 cursor-pointer self-end"
                   >
                     <span>Cấp Tài Khoản</span>
                     <span className="material-symbols-outlined text-xs">add_circle</span>
@@ -662,8 +660,8 @@ export default function AdminPage() {
                             </select>
                             
                             <button
-                              onClick={() => handleResetPassword(student.email)}
-                              title="Khôi phục mật khẩu (Gửi Email)"
+                              onClick={() => handleResetPassword(student)}
+                              title="Đổi mật khẩu tài khoản"
                               className="w-8 h-8 rounded-full bg-slate-105 hover:bg-blue-100 text-[#0058be] border border-slate-200 flex items-center justify-center transition-all cursor-pointer"
                             >
                               <span className="material-symbols-outlined text-base">password</span>
@@ -929,14 +927,16 @@ export default function AdminPage() {
                           >
                             <option value="text">📝 Văn bản</option>
                             <option value="video">🎥 Video (YouTube)</option>
+                            <option value="video_raw">🎬 Video (MP4)</option>
                             <option value="image">🖼️ Hình ảnh</option>
+                            <option value="audio">🎵 Âm thanh</option>
                           </select>
                         </div>
                       </div>
 
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                          {sec.type === 'video' ? 'Link YouTube' : sec.type === 'image' ? 'Link hình ảnh (URL)' : 'Nội dung văn bản'}
+                          {sec.type === 'video' ? 'Link YouTube' : sec.type === 'video_raw' ? 'Link Video (MP4)' : sec.type === 'image' ? 'Link hình ảnh (URL)' : sec.type === 'audio' ? 'Link Âm thanh (MP3)' : 'Nội dung văn bản'}
                         </label>
                         {sec.type === 'text' ? (
                           <textarea
@@ -960,7 +960,7 @@ export default function AdminPage() {
                               newSecs[idx].content = e.target.value;
                               setLessonSections(newSecs);
                             }}
-                            placeholder={sec.type === 'video' ? 'https://www.youtube.com/watch?v=...' : 'https://example.com/image.jpg'}
+                            placeholder={sec.type === 'video' ? 'https://www.youtube.com/watch?v=...' : sec.type === 'video_raw' ? 'https://example.com/video.mp4' : sec.type === 'audio' ? 'https://example.com/audio.mp3' : 'https://example.com/image.jpg'}
                             className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#0058be] shadow-sm"
                           />
                         )}
@@ -985,6 +985,18 @@ export default function AdminPage() {
                             <img src={sec.content} alt="Preview" className="w-full h-auto object-contain" onError={(e) => (e.currentTarget.style.display = 'none')} />
                           </div>
                         )}
+                        {/* Audio Preview */}
+                        {sec.type === 'audio' && sec.content && (
+                          <div className="mt-3 rounded-lg p-3 border border-slate-200 bg-black/5 w-full max-w-md">
+                            <audio src={sec.content} controls className="w-full" />
+                          </div>
+                        )}
+                        {/* Video Raw Preview */}
+                        {sec.type === 'video_raw' && sec.content && (
+                          <div className="mt-3 rounded-lg overflow-hidden border border-slate-200 bg-black/5 aspect-video w-full max-w-md">
+                            <video src={sec.content} controls className="w-full h-full" />
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1001,32 +1013,56 @@ export default function AdminPage() {
               <div className="mt-8 pt-6 border-t-2 border-slate-100">
                 <h4 className="font-display font-bold text-sm text-slate-800 mb-4">Danh sách Bài học hiện tại</h4>
                 <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 scroll-hide">
-                  {lessons.map(l => (
-                    <div key={l.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-200">
-                      <div className="flex flex-col gap-1">
-                        <span className="font-bold text-slate-700 text-sm leading-tight">{l.title}</span>
-                        <span className="text-xs text-slate-500">{l.subjectName} • {l.chapter}</span>
+                  {(() => {
+                    const grouped: Record<string, Record<string, typeof lessons>> = {};
+                    lessons.forEach(l => {
+                      if (!grouped[l.subjectName]) grouped[l.subjectName] = {};
+                      if (!grouped[l.subjectName][l.chapter]) grouped[l.subjectName][l.chapter] = [];
+                      grouped[l.subjectName][l.chapter].push(l);
+                    });
+                    
+                    if (lessons.length === 0) return <p className="text-slate-400 italic text-center">Chưa có bài học nào.</p>;
+
+                    return Object.keys(grouped).map(subj => (
+                      <div key={subj} className="mb-4 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                        <div className="bg-slate-100 px-3 py-2 border-b border-slate-200 font-display font-bold text-[#0058be] flex items-center gap-2">
+                          <span className="material-symbols-outlined text-sm">subject</span> {subj}
+                        </div>
+                        <div className="p-2 space-y-3">
+                          {Object.keys(grouped[subj]).map(chap => (
+                            <div key={chap} className="space-y-2">
+                              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider pl-1">{chap}</div>
+                              {grouped[subj][chap].map(l => (
+                                <div key={l.id} className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-100 hover:border-slate-300 transition-colors ml-2">
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className="font-bold text-slate-700 text-sm leading-tight">{l.title}</span>
+                                    <span className="text-[10px] text-slate-400 font-sans truncate max-w-[200px]">{l.summary}</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (window.confirm(`Bạn có chắc chắn muốn xóa bài học "${l.title}" không?`)) {
+                                        try {
+                                          await deleteLesson(l.id);
+                                          triggerToast(`Đã xóa thành công bài học ${l.title}`);
+                                        } catch (error: any) {
+                                          console.error(error);
+                                          alert(`Lỗi khi xóa bài học: ${error.message}`);
+                                        }
+                                      }
+                                    }}
+                                    className="text-red-400 hover:bg-red-50 hover:text-red-600 p-1.5 rounded-md shrink-0 transition-colors"
+                                  >
+                                    <span className="material-symbols-outlined text-base block">delete</span>
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (window.confirm(`Bạn có chắc chắn muốn xóa bài học "${l.title}" không?`)) {
-                            try {
-                              await deleteLesson(l.id);
-                              triggerToast(`Đã xóa thành công bài học ${l.title}`);
-                            } catch (error: any) {
-                              console.error(error);
-                              alert(`Lỗi khi xóa bài học: ${error.message}`);
-                            }
-                          }
-                        }}
-                        className="text-red-500 hover:bg-red-50 p-2 rounded-lg shrink-0"
-                      >
-                        <span className="material-symbols-outlined text-lg block">delete</span>
-                      </button>
-                    </div>
-                  ))}
-                  {lessons.length === 0 && <p className="text-slate-400 italic text-center">Chưa có bài học nào.</p>}
+                    ));
+                  })()}
                 </div>
               </div>
             </form>

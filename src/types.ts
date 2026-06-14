@@ -16,7 +16,7 @@ export interface Subject {
 export interface LessonSection {
   title: string;
   content: string;
-  type?: 'text' | 'video' | 'formula' | 'image';
+  type?: 'text' | 'video' | 'video_raw' | 'formula' | 'image' | 'audio';
 }
 
 export interface Lesson {
@@ -84,6 +84,7 @@ export interface Student {
   email: string;
   createdAt: string;
   teacherId?: string;
+  password?: string;
 }
 
 export interface Discussion {

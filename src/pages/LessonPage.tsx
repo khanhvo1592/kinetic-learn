@@ -139,7 +139,26 @@ export default function LessonPage() {
                 <div key={i}>
                   <h3 className="font-display font-bold text-lg text-slate-800 mb-3 text-cyan-800">{sec.title}</h3>
                   <div className="text-sm text-slate-700 leading-relaxed font-sans whitespace-pre-line bg-white p-4 rounded-[20px] shadow-sm border border-slate-100">
-                    {sec.content}
+                    {(!sec.type || sec.type === 'text') && <>{sec.content}</>}
+                    {sec.type === 'image' && <img src={sec.content} alt={sec.title} className="w-full h-auto rounded-xl" />}
+                    {sec.type === 'audio' && <audio src={sec.content} controls className="w-full" />}
+                    {sec.type === 'video_raw' && <video src={sec.content} controls className="w-full h-auto rounded-xl aspect-video" />}
+                    {sec.type === 'video' && sec.content && (
+                      <div className="aspect-video w-full rounded-xl overflow-hidden">
+                        <iframe 
+                          width="100%" 
+                          height="100%" 
+                          src={`https://www.youtube.com/embed/${(() => {
+                            const match = sec.content.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/);
+                            return (match && match[2].length === 11) ? match[2] : '';
+                          })()}`} 
+                          title="YouTube video player" 
+                          frameBorder="0" 
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                          allowFullScreen
+                        ></iframe>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

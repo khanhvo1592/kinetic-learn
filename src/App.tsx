@@ -14,6 +14,7 @@ import CoursesPage from './pages/CoursesPage';
 import TasksPage from './pages/TasksPage';
 import ProfilePage from './pages/ProfilePage';
 import LessonPage from './pages/LessonPage';
+import SubjectDetailPage from './pages/SubjectDetailPage';
 import QuizPage from './pages/QuizPage';
 import ResultPage from './pages/ResultPage';
 import SolutionsPage from './pages/SolutionsPage';
@@ -60,6 +61,11 @@ export default function App() {
             </Route>
 
             {/* Protected Routes without BottomNav (Full Screen) */}
+            <Route path="/subject/:id" element={
+              <RequireAuth>
+                <SubjectDetailPage />
+              </RequireAuth>
+            } />
             <Route path="/lesson/:id" element={
               <RequireAuth>
                 <LessonPage />

@@ -29,9 +29,8 @@ export default function CoursesPage() {
               key={subject.id} 
               subject={subject} 
               onClick={() => {
-                // Future: navigate to subject detail page
-                // navigate(`/subject/${subject.id}`);
-              }} 
+                navigate(`/subject/${subject.id}`);
+              }}
             />
           ))}
         </div>
