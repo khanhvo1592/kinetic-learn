@@ -139,7 +139,7 @@ export default function LessonPage() {
                 <div key={i}>
                   <h3 className="font-display font-bold text-lg text-slate-800 mb-3 text-cyan-800">{sec.title}</h3>
                   <div className="text-sm text-slate-700 leading-relaxed font-sans whitespace-pre-line bg-white p-4 rounded-[20px] shadow-sm border border-slate-100">
-                    {(!sec.type || sec.type === 'text') && <>{sec.content}</>}
+                    {(!sec.type || sec.type === 'text') && <div dangerouslySetInnerHTML={{ __html: sec.content }} className="prose prose-sm max-w-none prose-slate" />}
                     {sec.type === 'image' && <img src={sec.content} alt={sec.title} className="w-full h-auto rounded-xl" />}
                     {sec.type === 'audio' && <audio src={sec.content} controls className="w-full" />}
                     {sec.type === 'video_raw' && <video src={sec.content} controls className="w-full h-auto rounded-xl aspect-video" />}

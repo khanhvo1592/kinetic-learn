@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import { Subject, Lesson, QuizQuestion, Student } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 import { useAuth } from '../hooks/useAuth';
@@ -47,6 +49,7 @@ export default function AdminPage() {
   const [explanation, setExplanation] = useState('');
   const [quizInputMode, setQuizInputMode] = useState<'single' | 'bulk'>('single');
   const [bulkQuizText, setBulkQuizText] = useState('');
+  const [bulkPreviewQuizzes, setBulkPreviewQuizzes] = useState<QuizQuestion[]>([]);
   const [editingQuizId, setEditingQuizId] = useState<string | null>(null);
 
   // 4. Student Management States
@@ -234,9 +237,9 @@ export default function AdminPage() {
   const handleBulkCreateQuiz = () => {
     if (!bulkQuizText.trim()) return;
     const blocks = bulkQuizText.split(/(?:Câu hỏi|Question)\s*:/i).filter(b => b.trim() !== '');
-    let addedCount = 0;
+    const parsed: QuizQuestion[] = [];
     
-    blocks.forEach(block => {
+    blocks.forEach((block, index) => {
         const lines = block.split('\n').map(l => l.trim()).filter(l => l !== '');
         if (lines.length < 3) return;
         
@@ -262,8 +265,8 @@ export default function AdminPage() {
         if (!oA || !oB) return;
         
         const newQuiz: QuizQuestion = {
-            id: `quiz-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-            num: String(quizzes.length + addedCount + 1).padStart(2, '0'),
+            id: `preview-quiz-${Date.now()}-${index}`,
+            num: String(quizzes.length + parsed.length + 1).padStart(2, '0'),
             lessonId: quizLessonId,
             question: question,
             options: [
@@ -275,16 +278,26 @@ export default function AdminPage() {
             correctKey: cKey,
             explanation: expl
         };
-        onAddQuiz(newQuiz);
-        addedCount++;
+        parsed.push(newQuiz);
     });
     
-    if (addedCount > 0) {
-        triggerToast(`Đã thêm thành công ${addedCount} câu hỏi trắc nghiệm!`);
-        setBulkQuizText('');
+    if (parsed.length > 0) {
+        setBulkPreviewQuizzes(parsed);
     } else {
         alert('Không tìm thấy câu hỏi nào hợp lệ. Vui lòng kiểm tra lại định dạng văn bản.');
     }
+  };
+
+  const handleConfirmBulkQuizzes = () => {
+    bulkPreviewQuizzes.forEach(quiz => {
+        onAddQuiz({
+            ...quiz,
+            id: `quiz-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+        });
+    });
+    triggerToast(`Đã thêm thành công ${bulkPreviewQuizzes.length} câu hỏi trắc nghiệm!`);
+    setBulkQuizText('');
+    setBulkPreviewQuizzes([]);
   };
 
   const handleCreateStudent = (e: React.FormEvent) => {
@@ -967,18 +980,50 @@ export default function AdminPage() {
                 <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
                   {lessonSections.map((sec, idx) => (
                     <div key={idx} className="space-y-3 relative p-4 bg-slate-50 border-2 border-slate-100 rounded-xl hover:border-[#0058be]/30 transition-colors group">
-                      {lessonSections.length > 1 && (
-                        <button 
-                          type="button" 
-                          onClick={() => setLessonSections(lessonSections.filter((_, i) => i !== idx))}
-                          className="absolute right-3 top-3 text-slate-400 hover:text-rose-500 hover:bg-rose-50 w-8 h-8 flex items-center justify-center rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                          title="Xóa khối này"
+                      <div className="absolute right-3 top-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (idx > 0) {
+                              const newSecs = [...lessonSections];
+                              [newSecs[idx - 1], newSecs[idx]] = [newSecs[idx], newSecs[idx - 1]];
+                              setLessonSections(newSecs);
+                            }
+                          }}
+                          disabled={idx === 0}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#0058be] hover:bg-blue-50 disabled:opacity-30 disabled:hover:bg-transparent"
+                          title="Di chuyển lên"
                         >
-                          <span className="material-symbols-outlined text-sm">delete</span>
+                          <span className="material-symbols-outlined text-sm">arrow_upward</span>
                         </button>
-                      )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (idx < lessonSections.length - 1) {
+                              const newSecs = [...lessonSections];
+                              [newSecs[idx], newSecs[idx + 1]] = [newSecs[idx + 1], newSecs[idx]];
+                              setLessonSections(newSecs);
+                            }
+                          }}
+                          disabled={idx === lessonSections.length - 1}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#0058be] hover:bg-blue-50 disabled:opacity-30 disabled:hover:bg-transparent"
+                          title="Di chuyển xuống"
+                        >
+                          <span className="material-symbols-outlined text-sm">arrow_downward</span>
+                        </button>
+                        {lessonSections.length > 1 && (
+                          <button 
+                            type="button" 
+                            onClick={() => setLessonSections(lessonSections.filter((_, i) => i !== idx))}
+                            className="text-slate-400 hover:text-rose-500 hover:bg-rose-50 w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
+                            title="Xóa khối này"
+                          >
+                            <span className="material-symbols-outlined text-sm">delete</span>
+                          </button>
+                        )}
+                      </div>
                       
-                      <div className="flex gap-3">
+                      <div className="flex gap-3 pr-28">
                         <div className="flex-1 space-y-1">
                           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tiêu đề khối</label>
                           <input 
@@ -1020,17 +1065,19 @@ export default function AdminPage() {
                           {sec.type === 'video' ? 'Link YouTube' : sec.type === 'video_raw' ? 'Link Video (MP4)' : sec.type === 'image' ? 'Link hình ảnh (URL)' : sec.type === 'audio' ? 'Link Âm thanh (MP3)' : 'Nội dung văn bản'}
                         </label>
                         {sec.type === 'text' ? (
-                          <textarea
-                            required
-                            value={sec.content}
-                            onChange={(e) => {
-                              const newSecs = [...lessonSections];
-                              newSecs[idx].content = e.target.value;
-                              setLessonSections(newSecs);
-                            }}
-                            placeholder="Nhập nội dung chi tiết bài học..."
-                            className="w-full h-32 bg-white border border-slate-200 rounded-lg p-3 text-sm resize-y outline-none focus:border-[#0058be] shadow-sm"
-                          />
+                          <div className="bg-white rounded-lg border border-slate-200 overflow-hidden focus-within:border-[#0058be] shadow-sm">
+                            <ReactQuill
+                              theme="snow"
+                              value={sec.content}
+                              onChange={(val) => {
+                                const newSecs = [...lessonSections];
+                                newSecs[idx].content = val;
+                                setLessonSections(newSecs);
+                              }}
+                              placeholder="Nhập nội dung chi tiết bài học (hỗ trợ in đậm, danh sách...)"
+                              className="h-48 pb-10"
+                            />
+                          </div>
                         ) : (
                           <input
                             type="url"
@@ -1239,7 +1286,7 @@ export default function AdminPage() {
                     value={optA}
                     onChange={(e) => setOptA(e.target.value)}
                     placeholder="Đáp án A"
-                    className="w-full bg-slate-50 border border-slate-200 focus:border-[#0058be] rounded-xl px-3 py-2 text-xs"
+                    className={`w-full rounded-xl px-3 py-2 text-xs outline-none border ${correctKey === 'A' ? 'bg-green-50 border-green-400 focus:border-green-600 font-bold text-green-800' : 'bg-slate-50 border-slate-200 focus:border-[#0058be]'}`}
                   />
                 </div>
 
@@ -1251,7 +1298,7 @@ export default function AdminPage() {
                     value={optB}
                     onChange={(e) => setOptB(e.target.value)}
                     placeholder="Đáp án B"
-                    className="w-full bg-slate-50 border border-slate-200 focus:border-[#0058be] rounded-xl px-3 py-2 text-xs"
+                    className={`w-full rounded-xl px-3 py-2 text-xs outline-none border ${correctKey === 'B' ? 'bg-green-50 border-green-400 focus:border-green-600 font-bold text-green-800' : 'bg-slate-50 border-slate-200 focus:border-[#0058be]'}`}
                   />
                 </div>
 
@@ -1262,7 +1309,7 @@ export default function AdminPage() {
                     value={optC}
                     onChange={(e) => setOptC(e.target.value)}
                     placeholder="Đáp án C"
-                    className="w-full bg-slate-50 border border-slate-200 focus:border-[#0058be] rounded-xl px-3 py-2 text-xs"
+                    className={`w-full rounded-xl px-3 py-2 text-xs outline-none border ${correctKey === 'C' ? 'bg-green-50 border-green-400 focus:border-green-600 font-bold text-green-800' : 'bg-slate-50 border-slate-200 focus:border-[#0058be]'}`}
                   />
                 </div>
 
@@ -1273,7 +1320,7 @@ export default function AdminPage() {
                     value={optD}
                     onChange={(e) => setOptD(e.target.value)}
                     placeholder="Đáp án D"
-                    className="w-full bg-slate-50 border border-slate-200 focus:border-[#0058be] rounded-xl px-3 py-2 text-xs"
+                    className={`w-full rounded-xl px-3 py-2 text-xs outline-none border ${correctKey === 'D' ? 'bg-green-50 border-green-400 focus:border-green-600 font-bold text-green-800' : 'bg-slate-50 border-slate-200 focus:border-[#0058be]'}`}
                   />
                 </div>
               </div>
@@ -1347,13 +1394,54 @@ export default function AdminPage() {
                   />
                 </div>
                 
-                <button
-                  type="button"
-                  onClick={handleBulkCreateQuiz}
-                  className="w-full h-11 bg-emerald-600 text-white font-display font-bold rounded-xl shadow-[0_4px_0_0_#059669] hover:bg-emerald-700 active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  Phân tích & Thêm hàng loạt <span className="material-symbols-outlined text-sm">library_add</span>
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleBulkCreateQuiz}
+                    className="flex-1 h-11 bg-indigo-600 text-white font-display font-bold rounded-xl shadow-[0_4px_0_0_#4338ca] hover:bg-indigo-700 active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    Phân tích & Xem trước <span className="material-symbols-outlined text-sm">preview</span>
+                  </button>
+                  {bulkPreviewQuizzes.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setBulkPreviewQuizzes([])}
+                      className="w-11 h-11 bg-slate-200 text-slate-600 font-bold rounded-xl shadow-[0_4px_0_0_#cbd5e1] hover:bg-slate-300 active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center cursor-pointer"
+                      title="Hủy xem trước"
+                    >
+                      <span className="material-symbols-outlined text-sm">cancel</span>
+                    </button>
+                  )}
+                </div>
+
+                {bulkPreviewQuizzes.length > 0 && (
+                  <div className="mt-4 border border-indigo-100 bg-indigo-50/30 rounded-xl p-4">
+                    <h5 className="font-bold text-indigo-800 text-sm mb-3">Xem trước {bulkPreviewQuizzes.length} câu hỏi hợp lệ:</h5>
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+                      {bulkPreviewQuizzes.map((q, idx) => (
+                        <div key={idx} className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm text-xs">
+                          <p className="font-bold text-slate-800 mb-1">Q: {q.question}</p>
+                          <div className="grid grid-cols-2 gap-1 mb-2">
+                            {q.options.map(opt => (
+                              <div key={opt.key} className={`p-1.5 rounded border ${opt.key === q.correctKey ? 'bg-green-50 border-green-300 text-green-700 font-bold' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
+                                {opt.key}. {opt.text}
+                              </div>
+                            ))}
+                          </div>
+                          <p className="text-[10px] text-slate-500 italic border-t border-slate-100 pt-1 mt-1">Giải thích: {q.explanation}</p>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <button
+                      type="button"
+                      onClick={handleConfirmBulkQuizzes}
+                      className="w-full h-11 mt-4 bg-emerald-600 text-white font-display font-bold rounded-xl shadow-[0_4px_0_0_#059669] hover:bg-emerald-700 active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      Xác nhận Lưu {bulkPreviewQuizzes.length} câu hỏi <span className="material-symbols-outlined text-sm">save</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
             </form>
