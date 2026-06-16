@@ -6,6 +6,8 @@ import LessonCard from '../components/cards/LessonCard';
 import TaskCard from '../components/cards/TaskCard';
 import LeaderboardCard from '../components/cards/LeaderboardCard';
 import { useTasks } from '../hooks/useTasks';
+import { useQuizAttempts } from '../hooks/useQuizAttempts';
+import { useWrongQuestionStats } from '../hooks/useWrongQuestionStats';
 import { calculateLevel } from '../types';
 import confetti from 'canvas-confetti';
 
@@ -14,6 +16,8 @@ export default function HomePage() {
   const { currentUser } = useAuth();
   const { lessons, allStudents } = useAppContext();
   const { tasks, toggleTask } = useTasks();
+  const { recentAttempts } = useQuizAttempts();
+  const { activeWrongStats } = useWrongQuestionStats();
   const [cheeredStudents, setCheeredStudents] = useState<Record<string, boolean>>({});
 
   if (!currentUser) return null;
@@ -45,7 +49,7 @@ export default function HomePage() {
         <h1 className="text-2xl font-display font-bold mt-1">{currentUser.name}!</h1>
         <p className="text-sm opacity-90 mt-2 font-sans">Sẵn sàng chinh phục kiến thức hôm nay chưa nào? 🚀</p>
         <button 
-          onClick={() => navigate('/exam')} 
+          onClick={() => navigate('/exams')}
           className="mt-4 px-6 py-2.5 bg-white text-[#0058be] font-bold rounded-xl hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2 w-fit active:scale-95"
         >
           <span className="material-symbols-outlined text-sm">quiz</span> Làm bài kiểm tra
@@ -82,6 +86,50 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <section className="bg-white rounded-[24px] p-5 border border-slate-100 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display font-bold text-lg text-slate-800">Cần ôn lại</h2>
+            <span className="material-symbols-outlined text-rose-500">replay</span>
+          </div>
+          <p className="text-4xl font-display font-black text-rose-600">{activeWrongStats.length}</p>
+          <p className="text-xs text-slate-500 mt-1">câu sai chưa thành thạo</p>
+          <button
+            onClick={() => navigate('/review/wrong')}
+            className="mt-4 w-full bg-rose-50 text-rose-600 border border-rose-100 font-display font-bold py-3 rounded-xl hover:bg-rose-100 transition-colors flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined text-base">school</span>
+            Ôn câu sai
+          </button>
+        </section>
+
+        <section className="bg-white rounded-[24px] p-5 border border-slate-100 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display font-bold text-lg text-slate-800">Kết quả gần đây</h2>
+            <span className="material-symbols-outlined text-[#0058be]">history</span>
+          </div>
+          <div className="space-y-2">
+            {recentAttempts.length === 0 ? (
+              <p className="text-sm text-slate-500 py-5 text-center">Chưa có lịch sử làm bài.</p>
+            ) : recentAttempts.map(attempt => (
+              <button
+                key={attempt.id}
+                onClick={() => navigate(`/attempts/${attempt.id}`)}
+                className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-blue-50 transition-colors text-left"
+              >
+                <div>
+                  <p className="font-bold text-sm text-slate-700">
+                    {attempt.mode === 'exam' ? 'Đề kiểm tra' : attempt.mode === 'wrong_review' ? 'Ôn câu sai' : 'Quiz bài học'}
+                  </p>
+                  <p className="text-[10px] text-slate-400">{new Date(attempt.submittedAt).toLocaleString('vi-VN')}</p>
+                </div>
+                <span className="font-display font-black text-[#0058be]">{attempt.score}/10</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Daily Tasks Summary */}

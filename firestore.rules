@@ -2,15 +2,301 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Default deny catch-all
-    match /{document=**} {
-      allow read, write: if false;
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // students/{studentId}
+    //   PII-bearing profile. Owner may read/update public profile fields only.
+    //   Admin/teacher may read roster; admin may manage role/status/rewards.
+    //
+    // subjects/{subjectId}, lessons/{lessonId}, quizzes/{questionId}
+    //   Authenticated users may read catalog data. Admin/teacher may write.
+    //
+    // examTemplates/{examId}
+    //   Students may read published exams. Admin/teacher may manage all exams.
+    //
+    // quizAttempts/{attemptId}
+    //   User-owned immutable attempt result, created by the owner.
+    //
+    // wrongQuestionStats/{userId_questionId}
+    //   User-owned cache for wrong-question review.
+    //
+    // tasks/{taskId}
+    //   User-owned task data.
+    //
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function signedIn() {
+      return request.auth != null;
     }
 
-    // Default rule for the new project: Allow any logged-in user to read/write.
-    // In production, you would restrict this to only Admins for specific collections.
+    function adminEmail() {
+      return signedIn() && request.auth.token.email == 'weblemyhotel@gmail.com';
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/students/$(request.auth.uid));
+    }
+
+    function hasUserDoc() {
+      return signedIn() && exists(/databases/$(database)/documents/students/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return adminEmail() || (hasUserDoc() && userDoc().data.role == 'admin');
+    }
+
+    function isTeacher() {
+      return hasUserDoc() && userDoc().data.role == 'teacher';
+    }
+
+    function isStaff() {
+      return isAdmin() || isTeacher();
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function hasOnly(keys) {
+      return request.resource.data.keys().hasOnly(keys);
+    }
+
+    function hasAll(keys) {
+      return request.resource.data.keys().hasAll(keys);
+    }
+
+    function isString(field, maxSize) {
+      return request.resource.data[field] is string && request.resource.data[field].size() <= maxSize;
+    }
+
+    function optionalString(data, field, maxSize) {
+      return !data.keys().hasAny([field]) || (data[field] is string && data[field].size() <= maxSize);
+    }
+
+    function optionalStringList(data, field, maxSize) {
+      return !data.keys().hasAny([field]) || (data[field] is list && data[field].size() <= maxSize);
+    }
+
+    function isValidStudent(data) {
+      return data.keys().hasOnly(['id', 'name', 'username', 'avatar', 'xp', 'streak', 'role', 'status', 'email', 'createdAt', 'teacherId', 'password']) &&
+        data.keys().hasAll(['id', 'name', 'username', 'avatar', 'xp', 'streak', 'role', 'status', 'email', 'createdAt']) &&
+        data.id is string &&
+        data.name is string &&
+        data.username is string &&
+        data.avatar is string &&
+        data.xp is number &&
+        data.streak is number &&
+        data.role in ['student', 'teacher', 'admin'] &&
+        data.status in ['active', 'suspended'] &&
+        data.email is string &&
+        data.createdAt is string &&
+        optionalString(data, 'teacherId', 128) &&
+        optionalString(data, 'password', 128);
+    }
+
+    function isValidSubject(data) {
+      return data.keys().hasOnly(['id', 'name', 'icon', 'color', 'bgColor', 'borderColor', 'lessonsCount', 'exercisesCount']) &&
+        data.keys().hasAll(['id', 'name', 'icon', 'color', 'bgColor', 'borderColor', 'lessonsCount', 'exercisesCount']) &&
+        data.id is string &&
+        data.name is string &&
+        data.icon is string &&
+        data.color is string &&
+        data.bgColor is string &&
+        data.borderColor is string &&
+        data.lessonsCount is number &&
+        data.exercisesCount is number;
+    }
+
+    function isValidLesson(data) {
+      return data.keys().hasOnly(['id', 'subjectId', 'subjectName', 'title', 'chapter', 'progress', 'duration', 'lastStudied', 'iconBg', 'iconColor', 'iconName', 'videoUrl', 'summary', 'formulaTitle', 'formulas', 'sections']) &&
+        data.keys().hasAll(['id', 'subjectId', 'subjectName', 'title', 'chapter', 'progress', 'duration', 'lastStudied', 'iconBg', 'iconColor', 'iconName', 'summary', 'sections']) &&
+        data.id is string &&
+        data.subjectId is string &&
+        data.title is string &&
+        data.sections is list &&
+        optionalString(data, 'videoUrl', 2048) &&
+        optionalString(data, 'formulaTitle', 256) &&
+        optionalStringList(data, 'formulas', 100);
+    }
+
+    function isValidQuiz(data) {
+      return data.keys().hasOnly(['id', 'num', 'lessonId', 'subjectId', 'question', 'options', 'correctKey', 'explanation', 'difficulty', 'tags', 'createdBy', 'createdAt', 'updatedAt']) &&
+        data.keys().hasAll(['id', 'num', 'question', 'options', 'correctKey', 'explanation']) &&
+        data.id is string &&
+        data.num is string &&
+        data.question is string &&
+        data.options is list &&
+        data.correctKey in ['A', 'B', 'C', 'D'] &&
+        data.explanation is string &&
+        optionalString(data, 'lessonId', 128) &&
+        optionalString(data, 'subjectId', 128) &&
+        optionalString(data, 'difficulty', 16) &&
+        optionalStringList(data, 'tags', 50) &&
+        optionalString(data, 'createdBy', 128) &&
+        optionalString(data, 'createdAt', 64) &&
+        optionalString(data, 'updatedAt', 64);
+    }
+
+    function isValidExam(data) {
+      return data.keys().hasOnly(['id', 'title', 'subjectId', 'lessonIds', 'questionIds', 'durationSeconds', 'shuffleQuestions', 'shuffleOptions', 'status', 'createdBy', 'createdAt', 'updatedAt']) &&
+        data.keys().hasAll(['id', 'title', 'questionIds', 'durationSeconds', 'shuffleQuestions', 'shuffleOptions', 'status', 'createdBy', 'createdAt', 'updatedAt']) &&
+        data.id is string &&
+        data.title is string &&
+        optionalString(data, 'subjectId', 128) &&
+        optionalStringList(data, 'lessonIds', 100) &&
+        data.questionIds is list &&
+        data.questionIds.size() > 0 &&
+        data.questionIds.size() <= 200 &&
+        data.durationSeconds is number &&
+        data.durationSeconds > 0 &&
+        data.shuffleQuestions is bool &&
+        data.shuffleOptions is bool &&
+        data.status in ['draft', 'published', 'archived'] &&
+        data.createdBy is string &&
+        data.createdAt is string &&
+        data.updatedAt is string;
+    }
+
+    function isValidAttempt(data) {
+      return data.keys().hasOnly(['id', 'userId', 'mode', 'lessonId', 'examId', 'subjectId', 'questionIds', 'answers', 'correctQuestionIds', 'wrongQuestionIds', 'unansweredQuestionIds', 'score', 'totalQuestions', 'correctCount', 'wrongCount', 'startedAt', 'submittedAt', 'durationSeconds']) &&
+        data.keys().hasAll(['id', 'userId', 'mode', 'questionIds', 'answers', 'correctQuestionIds', 'wrongQuestionIds', 'unansweredQuestionIds', 'score', 'totalQuestions', 'correctCount', 'wrongCount', 'startedAt', 'submittedAt', 'durationSeconds']) &&
+        data.id is string &&
+        data.userId is string &&
+        data.mode in ['lesson_quiz', 'exam', 'wrong_review'] &&
+        optionalString(data, 'lessonId', 128) &&
+        optionalString(data, 'examId', 128) &&
+        optionalString(data, 'subjectId', 128) &&
+        data.questionIds is list &&
+        data.questionIds.size() <= 200 &&
+        data.answers is map &&
+        data.correctQuestionIds is list &&
+        data.wrongQuestionIds is list &&
+        data.unansweredQuestionIds is list &&
+        data.score is number &&
+        data.score >= 0 &&
+        data.score <= 10 &&
+        data.totalQuestions is number &&
+        data.correctCount is number &&
+        data.wrongCount is number &&
+        data.startedAt is string &&
+        data.submittedAt is string &&
+        data.durationSeconds is number;
+    }
+
+    function isValidWrongStat(data) {
+      return data.keys().hasOnly(['id', 'userId', 'questionId', 'subjectId', 'lessonId', 'wrongCount', 'lastWrongAt', 'lastAttemptId', 'mastered', 'masteredAt']) &&
+        data.keys().hasAll(['id', 'userId', 'questionId', 'wrongCount', 'lastWrongAt', 'lastAttemptId', 'mastered']) &&
+        data.id is string &&
+        data.userId is string &&
+        data.questionId is string &&
+        optionalString(data, 'subjectId', 128) &&
+        optionalString(data, 'lessonId', 128) &&
+        data.wrongCount is number &&
+        data.wrongCount >= 0 &&
+        data.lastWrongAt is string &&
+        data.lastAttemptId is string &&
+        data.mastered is bool &&
+        optionalString(data, 'masteredAt', 64);
+    }
+
+    function isValidTask(data) {
+      return data.keys().hasOnly(['id', 'userId', 'title', 'category', 'subInfo', 'xpReward', 'completed', 'completedTime']) &&
+        data.keys().hasAll(['id', 'userId', 'title', 'category', 'subInfo', 'xpReward', 'completed']) &&
+        data.id is string &&
+        data.userId is string &&
+        data.title is string &&
+        data.category is string &&
+        data.subInfo is string &&
+        data.xpReward is number &&
+        data.completed is bool &&
+        optionalString(data, 'completedTime', 64);
+    }
+
+    match /students/{studentId} {
+      allow read: if isOwner(studentId) || isStaff();
+      allow create: if signedIn() &&
+        isValidStudent(request.resource.data) &&
+        (
+          (isOwner(studentId) && request.resource.data.role == 'student' && request.resource.data.id == request.auth.uid) ||
+          (adminEmail() && request.resource.data.id == request.auth.uid && request.resource.data.role == 'admin') ||
+          isAdmin()
+        );
+      allow update: if signedIn() &&
+        isValidStudent(request.resource.data) &&
+        (
+          (isOwner(studentId) &&
+            request.resource.data.id == resource.data.id &&
+            request.resource.data.role == resource.data.role &&
+            request.resource.data.status == resource.data.status &&
+            request.resource.data.xp == resource.data.xp &&
+            request.resource.data.streak == resource.data.streak &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'username', 'avatar'])
+          ) ||
+          isAdmin()
+        );
+      allow delete: if isAdmin();
+    }
+
+    match /subjects/{subjectId} {
+      allow read: if signedIn();
+      allow create, update: if isStaff() && isValidSubject(request.resource.data);
+      allow delete: if isStaff();
+    }
+
+    match /lessons/{lessonId} {
+      allow read: if signedIn();
+      allow create, update: if isStaff() && isValidLesson(request.resource.data);
+      allow delete: if isStaff();
+
+      match /discussions/{discussionId} {
+        allow read: if signedIn();
+        allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+        allow update, delete: if isStaff() || (signedIn() && resource.data.userId == request.auth.uid);
+      }
+    }
+
+    match /quizzes/{questionId} {
+      allow read: if signedIn();
+      allow create, update: if isStaff() && isValidQuiz(request.resource.data);
+      allow delete: if isStaff();
+    }
+
+    match /examTemplates/{examId} {
+      allow read: if signedIn() && (isStaff() || resource.data.status == 'published');
+      allow create, update: if isStaff() && isValidExam(request.resource.data);
+      allow delete: if isStaff();
+    }
+
+    match /quizAttempts/{attemptId} {
+      allow read: if isStaff() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create: if signedIn() &&
+        isValidAttempt(request.resource.data) &&
+        request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /wrongQuestionStats/{statId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow create, update: if signedIn() &&
+        isValidWrongStat(request.resource.data) &&
+        request.resource.data.userId == request.auth.uid;
+      allow delete: if signedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    match /tasks/{taskId} {
+      allow read: if isStaff() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create, update: if signedIn() &&
+        isValidTask(request.resource.data) &&
+        request.resource.data.userId == request.auth.uid;
+      allow delete: if isStaff() || (signedIn() && resource.data.userId == request.auth.uid);
+    }
+
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if false;
     }
   }
 }

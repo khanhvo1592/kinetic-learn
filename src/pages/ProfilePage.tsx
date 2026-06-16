@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useStudents } from '../hooks/useStudents';
+import { useQuizAttempts } from '../hooks/useQuizAttempts';
 import { useNavigate } from 'react-router-dom';
 import LeaderboardCard from '../components/cards/LeaderboardCard';
 import ProfileEditModal from '../components/modals/ProfileEditModal';
@@ -8,6 +9,7 @@ import ProfileEditModal from '../components/modals/ProfileEditModal';
 export default function ProfilePage() {
   const { currentUser, logout, isAdmin, isTeacher } = useAuth();
   const { getLeaderboard } = useStudents();
+  const { attempts } = useQuizAttempts();
   const navigate = useNavigate();
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
 
@@ -79,16 +81,50 @@ export default function ProfilePage() {
           </button>
         </div>
 
+        <div className="flex-1 grid grid-cols-1 xl:grid-cols-2 gap-6 min-h-0">
+        {/* Result History */}
+        <div className="bg-white rounded-[32px] p-5 shadow-sm border border-slate-100 flex flex-col h-[500px] md:h-auto overflow-hidden">
+          <div className="flex items-center gap-2 mb-4 shrink-0">
+            <span className="material-symbols-outlined text-[#0058be]">history</span>
+            <h2 className="font-display font-bold text-lg text-slate-800">Lịch sử kiểm tra</h2>
+          </div>
+
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1 scroll-hide">
+            {attempts.length === 0 ? (
+              <div className="text-center py-10 text-slate-400 text-sm">Chưa có bài làm nào.</div>
+            ) : attempts.map(attempt => (
+              <button
+                key={attempt.id}
+                onClick={() => navigate(`/attempts/${attempt.id}`)}
+                className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-blue-50 hover:border-blue-100 transition-colors text-left flex items-center justify-between gap-4"
+              >
+                <div>
+                  <p className="font-display font-bold text-sm text-slate-800">
+                    {attempt.mode === 'exam' ? 'Đề kiểm tra' : attempt.mode === 'wrong_review' ? 'Ôn câu sai' : 'Quiz bài học'}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    {new Date(attempt.submittedAt).toLocaleString('vi-VN')} • {attempt.correctCount}/{attempt.totalQuestions} câu đúng
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="font-display font-black text-[#0058be] text-xl">{attempt.score}/10</p>
+                  <p className="text-[10px] text-slate-400 uppercase font-bold">Điểm</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Right Column: Leaderboard */}
-        <div className="bg-white rounded-[32px] p-5 shadow-sm border border-slate-100 flex-1 flex flex-col h-[500px] md:h-auto overflow-hidden">
+        <div className="bg-white rounded-[32px] p-5 shadow-sm border border-slate-100 flex flex-col h-[500px] md:h-auto overflow-hidden">
           <div className="flex items-center gap-2 mb-4 shrink-0">
             <span className="material-symbols-outlined text-[#0058be]">leaderboard</span>
             <h2 className="font-display font-bold text-lg text-slate-800">Bảng xếp hạng</h2>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto space-y-2 pr-1 scroll-hide">
             {leaderboard.map((student, idx) => (
-              <LeaderboardCard 
+              <LeaderboardCard
                 key={student.id}
                 student={student}
                 rank={idx + 1}
@@ -96,6 +132,7 @@ export default function ProfilePage() {
               />
             ))}
           </div>
+        </div>
         </div>
       </div>
 

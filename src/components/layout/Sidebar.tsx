@@ -8,6 +8,7 @@ export default function Sidebar() {
   const navItems = [
     { id: 'home', icon: 'home', label: 'Trang chủ', path: '/' },
     { id: 'courses', icon: 'school', label: 'Môn học', path: '/courses' },
+    { id: 'exams', icon: 'quiz', label: 'Kiểm tra', path: '/exams' },
     { id: 'tasks', icon: 'task_alt', label: 'Nhiệm vụ', path: '/tasks' },
     { id: 'profile', icon: 'person', label: 'Cá nhân', path: '/profile' }
   ];

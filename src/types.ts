@@ -63,6 +63,60 @@ export interface QuizQuestion {
   options: QuizOption[];
   correctKey: string;
   explanation: string;
+  difficulty?: 'easy' | 'medium' | 'hard';
+  tags?: string[];
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ExamTemplate {
+  id: string;
+  title: string;
+  subjectId?: string;
+  lessonIds?: string[];
+  questionIds: string[];
+  durationSeconds: number;
+  shuffleQuestions: boolean;
+  shuffleOptions: boolean;
+  status: 'draft' | 'published' | 'archived';
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QuizAttempt {
+  id: string;
+  userId: string;
+  mode: 'lesson_quiz' | 'exam' | 'wrong_review';
+  lessonId?: string;
+  examId?: string;
+  subjectId?: string;
+  questionIds: string[];
+  answers: Record<string, string>;
+  correctQuestionIds: string[];
+  wrongQuestionIds: string[];
+  unansweredQuestionIds: string[];
+  score: number;
+  totalQuestions: number;
+  correctCount: number;
+  wrongCount: number;
+  startedAt: string;
+  submittedAt: string;
+  durationSeconds: number;
+}
+
+export interface WrongQuestionStat {
+  id: string;
+  userId: string;
+  questionId: string;
+  subjectId?: string;
+  lessonId?: string;
+  wrongCount: number;
+  lastWrongAt: string;
+  lastAttemptId: string;
+  mastered: boolean;
+  masteredAt?: string;
 }
 
 export interface ChatMessage {

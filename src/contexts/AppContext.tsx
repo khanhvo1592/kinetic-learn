@@ -38,7 +38,7 @@ export function useAppContext(): AppContextType {
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const { currentUser, isAdmin } = useAuth();
+  const { currentUser, isAdmin, isTeacher } = useAuth();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [quizzes, setQuizzes] = useState<QuizQuestion[]>([]);
@@ -56,10 +56,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       let loadedSubjects = subjectsSnap.docs.map(d => d.data() as Subject);
 
       // Seed if empty (admin auto-seeds)
-      if (loadedSubjects.length === 0) {
+      if (loadedSubjects.length === 0 && (isAdmin || isTeacher)) {
         for (const s of SUBJECTS) {
           await setDoc(doc(db, 'subjects', s.id), s);
         }
+        loadedSubjects = SUBJECTS;
+      } else if (loadedSubjects.length === 0) {
         loadedSubjects = SUBJECTS;
       }
       setSubjects(loadedSubjects);
@@ -68,12 +70,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const lessonsSnap = await getDocs(collection(db, 'lessons'));
       let loadedLessons = lessonsSnap.docs.map(d => d.data() as Lesson);
 
-      if (loadedLessons.length === 0) {
+      if (loadedLessons.length === 0 && (isAdmin || isTeacher)) {
         const allLessons = [...RECENT_LESSONS, ...CHEMISTRY_LESSONS];
         for (const l of allLessons) {
           await setDoc(doc(db, 'lessons', l.id), l);
         }
         loadedLessons = allLessons;
+      } else if (loadedLessons.length === 0) {
+        loadedLessons = [...RECENT_LESSONS, ...CHEMISTRY_LESSONS];
       }
       setLessons(loadedLessons);
 
@@ -81,38 +85,44 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const quizzesSnap = await getDocs(collection(db, 'quizzes'));
       let loadedQuizzes = quizzesSnap.docs.map(d => d.data() as QuizQuestion);
 
-      if (loadedQuizzes.length === 0) {
+      if (loadedQuizzes.length === 0 && (isAdmin || isTeacher)) {
         for (const q of ATOM_QUIZ_QUESTIONS) {
           await setDoc(doc(db, 'quizzes', q.id), q);
         }
         loadedQuizzes = ATOM_QUIZ_QUESTIONS;
+      } else if (loadedQuizzes.length === 0) {
+        loadedQuizzes = ATOM_QUIZ_QUESTIONS;
       }
       setQuizzes(loadedQuizzes);
 
-      // Load students
-      const studentsSnap = await getDocs(collection(db, 'students'));
-      let loadedStudents = studentsSnap.docs.map(d => d.data() as Student);
+      // Load students. Students only need their own profile for the MVP;
+      // admins/teachers can load the roster for management and reports.
+      if (isAdmin || isTeacher) {
+        const studentsSnap = await getDocs(collection(db, 'students'));
+        let loadedStudents = studentsSnap.docs.map(d => d.data() as Student);
 
-      if (loadedStudents.length <= 1) {
-        // Seed mock students for leaderboard (only if no other students exist)
-        for (const s of MOCK_STUDENTS) {
-          const existingDoc = await getDocs(collection(db, 'students'));
-          const existingIds = existingDoc.docs.map(d => d.id);
-          if (!existingIds.includes(s.id)) {
-            await setDoc(doc(db, 'students', s.id), s);
+        if (loadedStudents.length <= 1) {
+          for (const s of MOCK_STUDENTS) {
+            const existingDoc = await getDocs(collection(db, 'students'));
+            const existingIds = existingDoc.docs.map(d => d.id);
+            if (!existingIds.includes(s.id)) {
+              await setDoc(doc(db, 'students', s.id), s);
+            }
           }
+          const refreshSnap = await getDocs(collection(db, 'students'));
+          loadedStudents = refreshSnap.docs.map(d => d.data() as Student);
         }
-        const refreshSnap = await getDocs(collection(db, 'students'));
-        loadedStudents = refreshSnap.docs.map(d => d.data() as Student);
+        setAllStudents(loadedStudents);
+      } else {
+        setAllStudents(currentUser ? [currentUser] : []);
       }
-      setAllStudents(loadedStudents);
 
     } catch (error) {
       console.error('Error loading data from Firestore:', error);
     } finally {
       setIsDataLoading(false);
     }
-  }, [currentUser]);
+  }, [currentUser, isAdmin, isTeacher]);
 
   useEffect(() => {
     if (currentUser) {

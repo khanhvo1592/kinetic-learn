@@ -1,17 +1,40 @@
-import React from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAppContext } from '../contexts/AppContext';
+import { useQuizAttempts } from '../hooks/useQuizAttempts';
+import { QuizAttempt } from '../types';
 import SolutionItem from '../components/quiz/SolutionItem';
 
 export default function SolutionsPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { attemptId } = useParams<{ attemptId: string }>();
   const { quizzes } = useAppContext();
+  const { getAttemptById } = useQuizAttempts();
+  const [attempt, setAttempt] = useState<QuizAttempt | null>(null);
+  const [isLoading, setIsLoading] = useState(!!attemptId);
+
+  useEffect(() => {
+    if (!attemptId) return;
+    setIsLoading(true);
+    getAttemptById(attemptId)
+      .then(setAttempt)
+      .finally(() => setIsLoading(false));
+  }, [attemptId, getAttemptById]);
 
   const state = location.state || {};
-  const { lessonId, userAnswers = {} } = state;
+  const fallbackUserAnswers = state.userAnswers || {};
 
-  const displayQuizzes = lessonId ? quizzes.filter(q => q.lessonId === lessonId) : [];
+  const displayQuizzes = useMemo(() => {
+    if (attempt) {
+      const byId = new Map(quizzes.map(q => [q.id, q]));
+      return attempt.questionIds.map(id => byId.get(id)).filter(Boolean);
+    }
+    if (state.lessonId) return quizzes.filter(q => q.lessonId === state.lessonId);
+    return [];
+  }, [attempt, quizzes, state.lessonId]);
+
+  const answers = attempt?.answers || fallbackUserAnswers;
 
   return (
     <div className="flex flex-col h-full bg-[#f7f9fb]">
@@ -20,16 +43,18 @@ export default function SolutionsPage() {
           <span className="material-symbols-outlined">arrow_back</span>
         </button>
         <h1 className="font-display font-bold text-lg text-slate-800">Đáp án chi tiết</h1>
-        <div className="w-10 h-10"></div> {/* Spacer */}
+        <div className="w-10 h-10"></div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
-        {displayQuizzes.length > 0 ? (
+        {isLoading ? (
+          <div className="text-center text-slate-500 mt-10">Đang tải lời giải...</div>
+        ) : displayQuizzes.length > 0 ? (
           displayQuizzes.map((q, idx) => (
-            <SolutionItem 
-              key={q.id}
-              question={q}
-              userAnswer={userAnswers[q.id] || null}
+            <SolutionItem
+              key={q!.id}
+              question={q!}
+              userAnswer={answers[q!.id] || null}
               index={idx}
             />
           ))

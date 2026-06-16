@@ -18,7 +18,9 @@ import SubjectDetailPage from './pages/SubjectDetailPage';
 import QuizPage from './pages/QuizPage';
 import ResultPage from './pages/ResultPage';
 import SolutionsPage from './pages/SolutionsPage';
+import ExamListPage from './pages/ExamListPage';
 import ExamPage from './pages/ExamPage';
+import WrongReviewPage from './pages/WrongReviewPage';
 import AdminPage from './pages/AdminPage';
 
 // Auth Guard
@@ -56,6 +58,7 @@ export default function App() {
             }>
               <Route index element={<HomePage />} />
               <Route path="courses" element={<CoursesPage />} />
+              <Route path="exams" element={<ExamListPage />} />
               <Route path="tasks" element={<TasksPage />} />
               <Route path="profile" element={<ProfilePage />} />
             </Route>
@@ -81,14 +84,30 @@ export default function App() {
                 <ResultPage />
               </RequireAuth>
             } />
+            <Route path="/attempts/:attemptId" element={
+              <RequireAuth>
+                <ResultPage />
+              </RequireAuth>
+            } />
             <Route path="/solutions" element={
               <RequireAuth>
                 <SolutionsPage />
               </RequireAuth>
             } />
-            <Route path="/exam" element={
+            <Route path="/attempts/:attemptId/solutions" element={
+              <RequireAuth>
+                <SolutionsPage />
+              </RequireAuth>
+            } />
+            <Route path="/exam/:examId" element={
               <RequireAuth>
                 <ExamPage />
+              </RequireAuth>
+            } />
+            <Route path="/exam" element={<Navigate to="/exams" replace />} />
+            <Route path="/review/wrong" element={
+              <RequireAuth>
+                <WrongReviewPage />
               </RequireAuth>
             } />
             <Route path="/admin" element={

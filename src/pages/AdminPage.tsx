@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
-import { Subject, Lesson, QuizQuestion, Student } from '../types';
+import { Subject, Lesson, QuizQuestion, Student, ExamTemplate } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 import { useAuth } from '../hooks/useAuth';
+import { useExamTemplates } from '../hooks/useExamTemplates';
 
 export default function AdminPage() {
   const navigate = useNavigate();
@@ -18,9 +19,11 @@ export default function AdminPage() {
   } = useAppContext();
   const onAddStudent = onUpdateStudent;
   const { isAdmin } = useAuth();
+  const { currentUser } = useAuth();
+  const { examTemplates, saveExamTemplate, deleteExamTemplate } = useExamTemplates();
   
-  // Tabs: 'subject' | 'lesson' | 'quiz' | 'students'
-  const [activeTab, setActiveTab] = useState<'subject' | 'lesson' | 'quiz' | 'students'>(isAdmin ? 'students' : 'lesson');
+  // Tabs: 'subject' | 'lesson' | 'quiz' | 'exam' | 'students'
+  const [activeTab, setActiveTab] = useState<'subject' | 'lesson' | 'quiz' | 'exam' | 'students'>(isAdmin ? 'students' : 'lesson');
   const [successMsg, setSuccessMsg] = useState('');
 
   // 1. Subject Form States
@@ -51,6 +54,13 @@ export default function AdminPage() {
   const [bulkQuizText, setBulkQuizText] = useState('');
   const [bulkPreviewQuizzes, setBulkPreviewQuizzes] = useState<QuizQuestion[]>([]);
   const [editingQuizId, setEditingQuizId] = useState<string | null>(null);
+
+  // 3b. Exam Template Form States
+  const [examTitle, setExamTitle] = useState('');
+  const [examSubjectId, setExamSubjectId] = useState('');
+  const [examDurationMinutes, setExamDurationMinutes] = useState(15);
+  const [examQuestionIds, setExamQuestionIds] = useState<string[]>([]);
+  const [editingExamId, setEditingExamId] = useState<string | null>(null);
 
   // 4. Student Management States
   const [searchStudent, setSearchStudent] = useState('');
@@ -300,6 +310,65 @@ export default function AdminPage() {
     setBulkPreviewQuizzes([]);
   };
 
+  const resetExamForm = () => {
+    setEditingExamId(null);
+    setExamTitle('');
+    setExamSubjectId('');
+    setExamDurationMinutes(15);
+    setExamQuestionIds([]);
+  };
+
+  const toggleExamQuestion = (questionId: string) => {
+    setExamQuestionIds(prev => (
+      prev.includes(questionId)
+        ? prev.filter(id => id !== questionId)
+        : [...prev, questionId]
+    ));
+  };
+
+  const handleSaveExam = async (status: ExamTemplate['status']) => {
+    if (!currentUser) return;
+    if (!examTitle.trim()) {
+      alert('Vui lòng nhập tên đề kiểm tra.');
+      return;
+    }
+    if (examQuestionIds.length === 0) {
+      alert('Vui lòng chọn ít nhất một câu hỏi.');
+      return;
+    }
+
+    const existing = editingExamId ? examTemplates.find(e => e.id === editingExamId) : null;
+    const now = new Date().toISOString();
+    const exam: ExamTemplate = {
+      id: existing?.id || `exam-${Date.now()}`,
+      title: examTitle.trim(),
+      subjectId: examSubjectId || undefined,
+      lessonIds: [],
+      questionIds: examQuestionIds,
+      durationSeconds: Math.max(1, Number(examDurationMinutes) || 15) * 60,
+      shuffleQuestions: existing?.shuffleQuestions ?? false,
+      shuffleOptions: existing?.shuffleOptions ?? false,
+      status,
+      createdBy: existing?.createdBy || currentUser.id,
+      createdAt: existing?.createdAt || now,
+      updatedAt: now,
+    };
+
+    await saveExamTemplate(exam);
+    triggerToast(status === 'published' ? 'Đã xuất bản đề kiểm tra!' : 'Đã lưu nháp đề kiểm tra!');
+    resetExamForm();
+  };
+
+  const startEditExam = (exam: ExamTemplate) => {
+    setEditingExamId(exam.id);
+    setExamTitle(exam.title);
+    setExamSubjectId(exam.subjectId || '');
+    setExamDurationMinutes(Math.max(1, Math.round(exam.durationSeconds / 60)));
+    setExamQuestionIds(exam.questionIds);
+    setActiveTab('exam');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleCreateStudent = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStudName.trim() || !newStudUsername.trim()) return;
@@ -440,6 +509,15 @@ export default function AdminPage() {
           >
             <span className="material-symbols-outlined">quiz</span>
             Quản lý trắc nghiệm
+          </button>
+          <button
+            onClick={() => setActiveTab('exam')}
+            className={`w-full text-left px-4 py-3 rounded-xl font-display font-bold text-sm transition-all flex items-center gap-3 ${
+              activeTab === 'exam' ? 'bg-blue-50 text-[#0058be]' : 'bg-transparent text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <span className="material-symbols-outlined">assignment</span>
+            Tạo đề kiểm tra
           </button>
         </div>
 
@@ -1220,6 +1298,152 @@ export default function AdminPage() {
           )}
 
           {/* TAB 3: CREATE QUIZ FORM */}
+          {activeTab === 'exam' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-[24px] p-6 shadow-sm border border-slate-100">
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h3 className="font-display font-black text-xl text-slate-800">Tạo đề kiểm tra</h3>
+                    <p className="text-xs text-slate-500 mt-1">Chọn câu hỏi từ ngân hàng trắc nghiệm để tạo đề cho học sinh.</p>
+                  </div>
+                  {editingExamId && (
+                    <button onClick={resetExamForm} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold text-xs hover:bg-slate-200">
+                      Hủy chỉnh sửa
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+                  <div className="space-y-1 md:col-span-1">
+                    <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">Tên đề</label>
+                    <input
+                      value={examTitle}
+                      onChange={(e) => setExamTitle(e.target.value)}
+                      placeholder="Ví dụ: Kiểm tra Hóa học chương 1"
+                      className="w-full bg-slate-50 border-2 border-slate-200 focus:border-[#0058be] rounded-xl px-4 py-3 text-xs outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">Môn học</label>
+                    <select
+                      value={examSubjectId}
+                      onChange={(e) => setExamSubjectId(e.target.value)}
+                      className="w-full bg-slate-50 border-2 border-slate-200 focus:border-[#0058be] rounded-xl px-4 py-3 text-xs outline-none"
+                    >
+                      <option value="">Tổng hợp</option>
+                      {subjects.map(subject => (
+                        <option key={subject.id} value={subject.id}>{subject.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">Thời gian phút</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={examDurationMinutes}
+                      onChange={(e) => setExamDurationMinutes(Number(e.target.value))}
+                      className="w-full bg-slate-50 border-2 border-slate-200 focus:border-[#0058be] rounded-xl px-4 py-3 text-xs outline-none font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-display font-bold text-sm text-slate-800">Chọn câu hỏi ({examQuestionIds.length})</h4>
+                    <button
+                      type="button"
+                      onClick={() => setExamQuestionIds(
+                        quizzes
+                          .filter(q => !examSubjectId || q.subjectId === examSubjectId || lessons.find(l => l.id === q.lessonId)?.subjectId === examSubjectId)
+                          .slice(0, 10)
+                          .map(q => q.id)
+                      )}
+                      className="text-xs font-bold text-[#0058be] hover:underline"
+                    >
+                      Chọn nhanh 10 câu
+                    </button>
+                  </div>
+                  <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                    {quizzes
+                      .filter(q => !examSubjectId || q.subjectId === examSubjectId || lessons.find(l => l.id === q.lessonId)?.subjectId === examSubjectId)
+                      .map(q => {
+                        const selected = examQuestionIds.includes(q.id);
+                        const lesson = lessons.find(l => l.id === q.lessonId);
+                        return (
+                          <button
+                            key={q.id}
+                            type="button"
+                            onClick={() => toggleExamQuestion(q.id)}
+                            className={`w-full p-3 rounded-xl border text-left transition-colors flex gap-3 ${
+                              selected ? 'bg-blue-50 border-[#0058be]/30 text-[#0058be]' : 'bg-white border-slate-100 text-slate-700 hover:border-slate-300'
+                            }`}
+                          >
+                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${selected ? 'bg-[#0058be] text-white' : 'bg-slate-100 text-slate-400'}`}>
+                              <span className="material-symbols-outlined text-sm">{selected ? 'check' : 'add'}</span>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-bold text-xs leading-relaxed">{q.question}</p>
+                              <p className="text-[10px] text-slate-400 mt-1">{lesson?.title || q.subjectId || 'Chưa phân loại'}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+
+                <div className="flex gap-3 mt-5">
+                  <button onClick={() => handleSaveExam('draft')} className="flex-1 h-11 bg-slate-200 text-slate-700 font-display font-bold rounded-xl shadow-[0_4px_0_0_#cbd5e1] hover:bg-slate-300 active:translate-y-[2px] active:shadow-none transition-all">
+                    Lưu nháp
+                  </button>
+                  <button onClick={() => handleSaveExam('published')} className="flex-1 h-11 bg-[#0058be] text-white font-display font-bold rounded-xl shadow-[0_4px_0_0_#004395] hover:bg-blue-700 active:translate-y-[2px] active:shadow-none transition-all">
+                    Xuất bản đề
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-[24px] p-6 shadow-sm border border-slate-100">
+                <h3 className="font-display font-black text-lg text-slate-800 mb-4">Danh sách đề kiểm tra</h3>
+                <div className="space-y-3">
+                  {examTemplates.length === 0 ? (
+                    <p className="text-center text-slate-400 py-8">Chưa có đề kiểm tra nào.</p>
+                  ) : examTemplates.map(exam => (
+                    <div key={exam.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-display font-bold text-sm text-slate-800">{exam.title}</h4>
+                          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                            exam.status === 'published' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                            exam.status === 'archived' ? 'bg-slate-100 text-slate-500 border-slate-200' :
+                            'bg-amber-50 text-amber-700 border-amber-100'
+                          }`}>
+                            {exam.status === 'published' ? 'Đã xuất bản' : exam.status === 'archived' ? 'Đã ẩn' : 'Nháp'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-1">{exam.questionIds.length} câu • {Math.round(exam.durationSeconds / 60)} phút</p>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <button onClick={() => startEditExam(exam)} className="w-9 h-9 rounded-lg bg-white border border-slate-200 text-blue-600 hover:bg-blue-50">
+                          <span className="material-symbols-outlined text-base">edit</span>
+                        </button>
+                        {exam.status !== 'archived' && (
+                          <button onClick={() => saveExamTemplate({ ...exam, status: 'archived', updatedAt: new Date().toISOString() })} className="w-9 h-9 rounded-lg bg-white border border-slate-200 text-slate-500 hover:bg-slate-100">
+                            <span className="material-symbols-outlined text-base">archive</span>
+                          </button>
+                        )}
+                        <button onClick={() => {
+                          if (window.confirm('Bạn có chắc chắn muốn xóa đề này?')) deleteExamTemplate(exam.id);
+                        }} className="w-9 h-9 rounded-lg bg-white border border-slate-200 text-rose-500 hover:bg-rose-50">
+                          <span className="material-symbols-outlined text-base">delete</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'quiz' && (
             <>
             <form onSubmit={handleCreateQuiz} className="space-y-4 font-sans text-xs">
