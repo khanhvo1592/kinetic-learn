@@ -21,6 +21,23 @@ interface PublicQuizResult {
   durationSeconds: number;
 }
 
+async function readJsonResponse<T>(res: Response, fallbackMessage: string): Promise<T> {
+  const contentType = res.headers.get('content-type') || '';
+  const rawBody = await res.text();
+
+  if (!contentType.includes('application/json')) {
+    const isHtml = rawBody.trim().startsWith('<');
+    throw new Error(isHtml ? 'API public quiz chưa phản hồi JSON. Vui lòng chạy app bằng server Express (npm run dev) hoặc kiểm tra cấu hình API.' : fallbackMessage);
+  }
+
+  const data = rawBody ? JSON.parse(rawBody) : {};
+  if (!res.ok) {
+    throw new Error(data.error || data.details || fallbackMessage);
+  }
+
+  return data as T;
+}
+
 export default function PublicQuizPage() {
   const { slug } = useParams<{ slug: string }>();
   const startTimeRef = useRef(new Date().toISOString());
@@ -41,9 +58,7 @@ export default function PublicQuizPage() {
     setIsLoading(true);
     fetch(`/api/public-quiz/${slug}`)
       .then(async (res) => {
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Không thể tải đề.');
-        return data as PublicQuizPayload;
+        return readJsonResponse<PublicQuizPayload>(res, 'Không thể tải đề.');
       })
       .then((data) => {
         if (!cancelled) setQuiz(data);
@@ -94,8 +109,7 @@ export default function PublicQuizPage() {
           startedAt: startTimeRef.current,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Không thể nộp bài.');
+      const data = await readJsonResponse<PublicQuizResult>(res, 'Không thể nộp bài.');
       setResult(data as PublicQuizResult);
     } catch (err: any) {
       setError(err.message || 'Không thể nộp bài.');

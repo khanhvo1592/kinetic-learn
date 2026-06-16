@@ -10,6 +10,7 @@ import { applicationDefault, cert, getApps, initializeApp } from "firebase-admin
 import { getFirestore } from "firebase-admin/firestore";
 function getAdminDb() {
   if (!getApps().length) {
+    const projectId = process.env.FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || "kinetic-learning-backend";
     const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
     if (serviceAccountJson) {
       const serviceAccount = JSON.parse(serviceAccountJson);
@@ -17,11 +18,13 @@ function getAdminDb() {
         serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
       }
       initializeApp({
-        credential: cert(serviceAccount)
+        credential: cert(serviceAccount),
+        projectId
       });
     } else {
       initializeApp({
-        credential: applicationDefault()
+        credential: applicationDefault(),
+        projectId
       });
     }
   }
