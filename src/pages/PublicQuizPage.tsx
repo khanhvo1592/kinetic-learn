@@ -45,7 +45,7 @@ async function readJsonResponse<T>(res: Response, fallbackMessage: string): Prom
 
   const data = rawBody ? JSON.parse(rawBody) : {};
   if (!res.ok) {
-    throw new Error(data.error || data.details || fallbackMessage);
+    throw new Error(data.details || data.error || fallbackMessage);
   }
 
   return data as T;
@@ -187,46 +187,51 @@ export default function PublicQuizPage() {
       setResult(data as PublicQuizResult);
     } catch (err: any) {
       if (clientAnswerKeys && clientMeta) {
-        const now = new Date();
-        const startedAtMs = Date.parse(startTimeRef.current);
-        const durationSeconds = Number.isFinite(startedAtMs)
-          ? Math.max(0, Math.floor((now.getTime() - startedAtMs) / 1000))
-          : 0;
-        const correctCount = quiz.questions.filter(question => answers[question.id] === clientAnswerKeys[question.id]).length;
-        const unansweredCount = quiz.questions.filter(question => !answers[question.id]).length;
-        const wrongCount = quiz.questions.length - correctCount - unansweredCount;
-        const attemptId = `public-attempt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-        const fallbackResult: PublicQuizResult = {
-          attemptId,
-          score: quiz.questions.length > 0 ? Math.round((correctCount / quiz.questions.length) * 10) : 0,
-          totalQuestions: quiz.questions.length,
-          correctCount,
-          wrongCount,
-          unansweredCount,
-          durationSeconds,
-        };
+        try {
+          const now = new Date();
+          const startedAtMs = Date.parse(startTimeRef.current);
+          const durationSeconds = Number.isFinite(startedAtMs)
+            ? Math.max(0, Math.floor((now.getTime() - startedAtMs) / 1000))
+            : 0;
+          const correctCount = quiz.questions.filter(question => answers[question.id] === clientAnswerKeys[question.id]).length;
+          const unansweredCount = quiz.questions.filter(question => !answers[question.id]).length;
+          const wrongCount = quiz.questions.length - correctCount - unansweredCount;
+          const attemptId = `public-attempt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          const fallbackResult: PublicQuizResult = {
+            attemptId,
+            score: quiz.questions.length > 0 ? Math.round((correctCount / quiz.questions.length) * 10) : 0,
+            totalQuestions: quiz.questions.length,
+            correctCount,
+            wrongCount,
+            unansweredCount,
+            durationSeconds,
+          };
 
-        await setDoc(doc(db, 'publicQuizAttempts', attemptId), {
-          id: attemptId,
-          examId: clientMeta.examId,
-          shareSlug: clientMeta.shareSlug,
-          displayName,
-          ...(contact ? { contact } : {}),
-          ...(className ? { className } : {}),
-          answers,
-          score: fallbackResult.score,
-          totalQuestions: fallbackResult.totalQuestions,
-          correctCount,
-          wrongCount,
-          unansweredCount,
-          startedAt: startTimeRef.current,
-          submittedAt: now.toISOString(),
-          durationSeconds,
-          teacherId: clientMeta.teacherId,
-          createdBy: clientMeta.createdBy,
-        });
-        setResult(fallbackResult);
-        return;
+          await setDoc(doc(db, 'publicQuizAttempts', attemptId), {
+            id: attemptId,
+            examId: clientMeta.examId,
+            shareSlug: clientMeta.shareSlug,
+            displayName,
+            ...(contact ? { contact } : {}),
+            ...(className ? { className } : {}),
+            answers,
+            score: fallbackResult.score,
+            totalQuestions: fallbackResult.totalQuestions,
+            correctCount,
+            wrongCount,
+            unansweredCount,
+            startedAt: startTimeRef.current,
+            submittedAt: now.toISOString(),
+            durationSeconds,
+            teacherId: clientMeta.teacherId,
+            createdBy: clientMeta.createdBy,
+          });
+          setResult(fallbackResult);
+          return;
+        } catch (fallbackError: any) {
+          setError(fallbackError.message || 'Không thể lưu kết quả bằng chế độ local.');
+          return;
+        }
       }
 
       setError(err.message || 'Không thể nộp bài.');
