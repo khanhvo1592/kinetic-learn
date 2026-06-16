@@ -25,6 +25,13 @@ export interface Lesson {
   subjectName: string;
   title: string;
   chapter: string;
+  mediaType?: 'image' | 'youtube' | 'video' | 'none';
+  mediaUrl?: string;
+  status?: 'draft' | 'published' | 'archived';
+  createdBy?: string;
+  teacherId?: string;
+  createdAt?: string;
+  updatedAt?: string;
   progress: number;
   duration: string;
   lastStudied: string;
@@ -59,13 +66,14 @@ export interface QuizQuestion {
   num: string;
   lessonId?: string;
   subjectId?: string;
+  createdBy?: string;
+  teacherId?: string;
   question: string;
   options: QuizOption[];
   correctKey: string;
   explanation: string;
   difficulty?: 'easy' | 'medium' | 'hard';
   tags?: string[];
-  createdBy?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -80,9 +88,41 @@ export interface ExamTemplate {
   shuffleQuestions: boolean;
   shuffleOptions: boolean;
   status: 'draft' | 'published' | 'archived';
+  isPublic?: boolean;
+  shareSlug?: string;
+  publicTitle?: string;
+  requireName?: boolean;
+  teacherId?: string;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PublicQuizQuestion {
+  id: string;
+  num: string;
+  question: string;
+  options: QuizOption[];
+}
+
+export interface PublicQuizAttempt {
+  id: string;
+  examId: string;
+  shareSlug: string;
+  displayName: string;
+  contact?: string;
+  className?: string;
+  answers: Record<string, string>;
+  score: number;
+  totalQuestions: number;
+  correctCount: number;
+  wrongCount: number;
+  unansweredCount: number;
+  startedAt: string;
+  submittedAt: string;
+  durationSeconds: number;
+  teacherId?: string;
+  createdBy: string;
 }
 
 export interface QuizAttempt {

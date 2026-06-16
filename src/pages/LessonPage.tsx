@@ -16,6 +16,7 @@ export default function LessonPage() {
   const { currentUser } = useAuth();
   
   const [activeTab, setActiveTab] = useState<'summary' | 'docs' | 'discussion'>('summary');
+  const [activeSectionIdx, setActiveSectionIdx] = useState(0);
   const [isAIOpen, setIsAIOpen] = useState(false);
   const [isDictOpen, setIsDictOpen] = useState(false);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
@@ -45,15 +46,34 @@ export default function LessonPage() {
     );
   }
 
+  const getYoutubeId = (url: string) => {
+    const match = url.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/);
+    return (match && match[2].length === 11) ? match[2] : '';
+  };
+
+  const primaryMediaUrl = lesson.mediaUrl || lesson.videoUrl || '';
+  const primaryMediaType = lesson.mediaType || (lesson.videoUrl ? 'video' : 'none');
+  const activeSection = lesson.sections[activeSectionIdx] || lesson.sections[0];
+
   return (
     <div className="flex flex-col h-full bg-white relative">
-      {/* Video Header Area */}
+      {/* Media Header Area */}
       <div className="w-full bg-slate-900 aspect-video relative flex items-center justify-center overflow-hidden flex-shrink-0 z-10 shadow-md">
         <button onClick={() => navigate(-1)} className="absolute top-4 left-4 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur-md hover:bg-black/60 transition-colors z-20">
           <span className="material-symbols-outlined text-lg">arrow_back</span>
         </button>
-        {lesson.videoUrl ? (
-          <video src={lesson.videoUrl} className="w-full h-full object-cover" controls playsInline />
+        {primaryMediaType === 'video' && primaryMediaUrl ? (
+          <video src={primaryMediaUrl} className="w-full h-full object-cover" controls playsInline />
+        ) : primaryMediaType === 'image' && primaryMediaUrl ? (
+          <img src={primaryMediaUrl} alt={lesson.title} className="w-full h-full object-cover" />
+        ) : primaryMediaType === 'youtube' && primaryMediaUrl ? (
+          <iframe
+            className="w-full h-full"
+            src={`https://www.youtube.com/embed/${getYoutubeId(primaryMediaUrl)}`}
+            title={lesson.title}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
         ) : (
           <div className="text-center p-6">
             <div className={`w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center shadow-lg ${lesson.iconBg} ${lesson.iconColor}`}>
@@ -112,10 +132,52 @@ export default function LessonPage() {
         {/* Tab Content */}
         <div className="flex-1 overflow-y-auto px-5 py-6 no-scrollbar pb-24 z-0 relative">
           {activeTab === 'summary' && (
-            <div className="space-y-6 animate-fadeIn">
+            <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-5 animate-fadeIn">
+              <aside className="bg-white border border-slate-100 rounded-2xl p-3 h-fit lg:sticky lg:top-3 shadow-sm">
+                <p className="font-display font-black text-xs text-slate-500 uppercase mb-3">Chapters</p>
+                <div className="space-y-2">
+                  {lesson.sections.map((sec, idx) => (
+                    <button
+                      key={`${sec.title}-${idx}`}
+                      onClick={() => setActiveSectionIdx(idx)}
+                      className={`w-full text-left px-3 py-2.5 rounded-xl border text-xs font-bold transition-colors ${
+                        idx === activeSectionIdx ? 'bg-blue-50 border-[#0058be]/20 text-[#0058be]' : 'bg-slate-50 border-slate-100 text-slate-600 hover:bg-white'
+                      }`}
+                    >
+                      <span className="mr-1">{idx + 1}.</span>{sec.title || `Chapter ${idx + 1}`}
+                    </button>
+                  ))}
+                </div>
+              </aside>
+
+              <div className="space-y-6">
               <div className="bento-card rounded-2xl p-4 bg-white/60">
                 <p className="text-slate-700 text-sm leading-relaxed font-sans">{lesson.summary}</p>
               </div>
+              {activeSection && (
+                <div>
+                  <h3 className="font-display font-bold text-xl text-slate-800 mb-3">{activeSection.title}</h3>
+                  <div className="text-sm text-slate-700 leading-relaxed font-sans whitespace-pre-line bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                    {(!activeSection.type || activeSection.type === 'text') && <div dangerouslySetInnerHTML={{ __html: activeSection.content }} className="prose prose-sm max-w-none prose-slate" />}
+                    {activeSection.type === 'image' && <img src={activeSection.content} alt={activeSection.title} className="w-full h-auto rounded-xl" />}
+                    {activeSection.type === 'audio' && <audio src={activeSection.content} controls className="w-full" />}
+                    {activeSection.type === 'video_raw' && <video src={activeSection.content} controls className="w-full h-auto rounded-xl aspect-video" />}
+                    {activeSection.type === 'video' && activeSection.content && (
+                      <div className="aspect-video w-full rounded-xl overflow-hidden">
+                        <iframe
+                          width="100%"
+                          height="100%"
+                          src={`https://www.youtube.com/embed/${getYoutubeId(activeSection.content)}`}
+                          title={activeSection.title}
+                          frameBorder="0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               {lesson.formulaTitle && (
                 <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-4">
                   <h4 className="font-display font-bold text-[#0058be] text-sm mb-3 flex items-center gap-2">
@@ -130,6 +192,7 @@ export default function LessonPage() {
                   </ul>
                 </div>
               )}
+              </div>
             </div>
           )}
 

@@ -5,6 +5,10 @@ import { ExamTemplate } from '../types';
 import { useAuth } from './useAuth';
 import { useAppContext } from '../contexts/AppContext';
 
+function stripUndefined<T extends Record<string, any>>(value: T): T {
+  return Object.fromEntries(Object.entries(value).filter(([, fieldValue]) => fieldValue !== undefined)) as T;
+}
+
 export function useExamTemplates() {
   const { currentUser, isAdmin, isTeacher } = useAuth();
   const { quizzes } = useAppContext();
@@ -20,9 +24,11 @@ export function useExamTemplates() {
 
     setIsLoading(true);
     const templatesRef = collection(db, 'examTemplates');
-    const templatesQuery = isAdmin || isTeacher
+    const templatesQuery = isAdmin
       ? templatesRef
-      : query(templatesRef, where('status', '==', 'published'));
+      : isTeacher
+        ? query(templatesRef, where('createdBy', '==', currentUser.id))
+        : query(templatesRef, where('status', '==', 'published'));
 
     const unsubscribe = onSnapshot(
       templatesQuery,
@@ -76,7 +82,18 @@ export function useExamTemplates() {
   }, [visibleExamTemplates]);
 
   const saveExamTemplate = useCallback(async (exam: ExamTemplate) => {
-    await setDoc(doc(db, 'examTemplates', exam.id), exam);
+    const now = new Date().toISOString();
+    const shareSlug = exam.shareSlug || `${exam.id.replace(/^exam-/, '')}-${Math.random().toString(36).slice(2, 8)}`;
+    const nextExam: ExamTemplate = {
+      ...exam,
+      isPublic: exam.status === 'published' ? (exam.isPublic ?? true) : (exam.isPublic ?? false),
+      shareSlug: exam.status === 'published' ? shareSlug : exam.shareSlug,
+      publicTitle: exam.publicTitle || exam.title,
+      requireName: exam.requireName ?? true,
+      teacherId: exam.teacherId || exam.createdBy,
+      updatedAt: now,
+    };
+    await setDoc(doc(db, 'examTemplates', exam.id), stripUndefined(nextExam));
   }, []);
 
   const deleteExamTemplate = useCallback(async (id: string) => {

@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
+import { loadPublicQuiz, submitPublicQuiz } from './server/publicQuiz';
 
 dotenv.config();
 
@@ -62,6 +63,45 @@ app.post('/api/chat', async (req, res) => {
       error: 'Failed to generate response from Gemini', 
       details: error.message || String(error) 
     });
+  }
+});
+
+app.get('/api/public-quiz/:slug', async (req, res) => {
+  try {
+    const quiz = await loadPublicQuiz(req.params.slug);
+    if (!quiz) {
+      return res.status(404).json({ error: 'Link làm bài không tồn tại hoặc đã bị ẩn.' });
+    }
+    res.json(quiz);
+  } catch (error: any) {
+    console.error('Public quiz load error:', error);
+    res.status(500).json({ error: 'Không thể tải đề kiểm tra public.', details: error.message });
+  }
+});
+
+app.post('/api/public-quiz/:slug/submit', async (req, res) => {
+  try {
+    const result = await submitPublicQuiz(req.params.slug, req.body);
+    if (!result) {
+      return res.status(404).json({ error: 'Link làm bài không tồn tại hoặc đã bị ẩn.' });
+    }
+    res.json(result);
+  } catch (error: any) {
+    console.error('Public quiz submit error:', error);
+    res.status(error.statusCode || 500).json({ error: error.message || 'Không thể lưu kết quả.' });
+  }
+});
+
+app.post('/api/public-quiz/:slug', async (req, res) => {
+  try {
+    const result = await submitPublicQuiz(req.params.slug, req.body);
+    if (!result) {
+      return res.status(404).json({ error: 'Link làm bài không tồn tại hoặc đã bị ẩn.' });
+    }
+    res.json(result);
+  } catch (error: any) {
+    console.error('Public quiz submit error:', error);
+    res.status(error.statusCode || 500).json({ error: error.message || 'Không thể lưu kết quả.' });
   }
 });
 

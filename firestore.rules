@@ -81,6 +81,18 @@ service cloud.firestore {
       return !data.keys().hasAny([field]) || (data[field] is list && data[field].size() <= maxSize);
     }
 
+    function optionalBool(data, field) {
+      return !data.keys().hasAny([field]) || data[field] is bool;
+    }
+
+    function ownsData(data) {
+      return signedIn() && (
+        isAdmin() ||
+        data.createdBy == request.auth.uid ||
+        data.teacherId == request.auth.uid
+      );
+    }
+
     function isValidStudent(data) {
       return data.keys().hasOnly(['id', 'name', 'username', 'avatar', 'xp', 'streak', 'role', 'status', 'email', 'createdAt', 'teacherId', 'password']) &&
         data.keys().hasAll(['id', 'name', 'username', 'avatar', 'xp', 'streak', 'role', 'status', 'email', 'createdAt']) &&
@@ -112,19 +124,28 @@ service cloud.firestore {
     }
 
     function isValidLesson(data) {
-      return data.keys().hasOnly(['id', 'subjectId', 'subjectName', 'title', 'chapter', 'progress', 'duration', 'lastStudied', 'iconBg', 'iconColor', 'iconName', 'videoUrl', 'summary', 'formulaTitle', 'formulas', 'sections']) &&
+      return data.keys().hasOnly(['id', 'subjectId', 'subjectName', 'title', 'chapter', 'mediaType', 'mediaUrl', 'status', 'createdBy', 'teacherId', 'createdAt', 'updatedAt', 'progress', 'duration', 'lastStudied', 'iconBg', 'iconColor', 'iconName', 'videoUrl', 'summary', 'formulaTitle', 'formulas', 'sections']) &&
         data.keys().hasAll(['id', 'subjectId', 'subjectName', 'title', 'chapter', 'progress', 'duration', 'lastStudied', 'iconBg', 'iconColor', 'iconName', 'summary', 'sections']) &&
         data.id is string &&
         data.subjectId is string &&
         data.title is string &&
         data.sections is list &&
+        optionalString(data, 'mediaType', 16) &&
+        (!data.keys().hasAny(['mediaType']) || data.mediaType in ['image', 'youtube', 'video', 'none']) &&
+        optionalString(data, 'mediaUrl', 2048) &&
+        optionalString(data, 'status', 16) &&
+        (!data.keys().hasAny(['status']) || data.status in ['draft', 'published', 'archived']) &&
+        optionalString(data, 'createdBy', 128) &&
+        optionalString(data, 'teacherId', 128) &&
+        optionalString(data, 'createdAt', 64) &&
+        optionalString(data, 'updatedAt', 64) &&
         optionalString(data, 'videoUrl', 2048) &&
         optionalString(data, 'formulaTitle', 256) &&
         optionalStringList(data, 'formulas', 100);
     }
 
     function isValidQuiz(data) {
-      return data.keys().hasOnly(['id', 'num', 'lessonId', 'subjectId', 'question', 'options', 'correctKey', 'explanation', 'difficulty', 'tags', 'createdBy', 'createdAt', 'updatedAt']) &&
+      return data.keys().hasOnly(['id', 'num', 'lessonId', 'subjectId', 'question', 'options', 'correctKey', 'explanation', 'difficulty', 'tags', 'createdBy', 'teacherId', 'createdAt', 'updatedAt']) &&
         data.keys().hasAll(['id', 'num', 'question', 'options', 'correctKey', 'explanation']) &&
         data.id is string &&
         data.num is string &&
@@ -137,12 +158,13 @@ service cloud.firestore {
         optionalString(data, 'difficulty', 16) &&
         optionalStringList(data, 'tags', 50) &&
         optionalString(data, 'createdBy', 128) &&
+        optionalString(data, 'teacherId', 128) &&
         optionalString(data, 'createdAt', 64) &&
         optionalString(data, 'updatedAt', 64);
     }
 
     function isValidExam(data) {
-      return data.keys().hasOnly(['id', 'title', 'subjectId', 'lessonIds', 'questionIds', 'durationSeconds', 'shuffleQuestions', 'shuffleOptions', 'status', 'createdBy', 'createdAt', 'updatedAt']) &&
+      return data.keys().hasOnly(['id', 'title', 'subjectId', 'lessonIds', 'questionIds', 'durationSeconds', 'shuffleQuestions', 'shuffleOptions', 'status', 'isPublic', 'shareSlug', 'publicTitle', 'requireName', 'teacherId', 'createdBy', 'createdAt', 'updatedAt']) &&
         data.keys().hasAll(['id', 'title', 'questionIds', 'durationSeconds', 'shuffleQuestions', 'shuffleOptions', 'status', 'createdBy', 'createdAt', 'updatedAt']) &&
         data.id is string &&
         data.title is string &&
@@ -156,9 +178,38 @@ service cloud.firestore {
         data.shuffleQuestions is bool &&
         data.shuffleOptions is bool &&
         data.status in ['draft', 'published', 'archived'] &&
+        optionalBool(data, 'isPublic') &&
+        optionalString(data, 'shareSlug', 160) &&
+        optionalString(data, 'publicTitle', 256) &&
+        optionalBool(data, 'requireName') &&
+        optionalString(data, 'teacherId', 128) &&
         data.createdBy is string &&
         data.createdAt is string &&
         data.updatedAt is string;
+    }
+
+    function isValidPublicAttempt(data) {
+      return data.keys().hasOnly(['id', 'examId', 'shareSlug', 'displayName', 'contact', 'className', 'answers', 'score', 'totalQuestions', 'correctCount', 'wrongCount', 'unansweredCount', 'startedAt', 'submittedAt', 'durationSeconds', 'teacherId', 'createdBy']) &&
+        data.keys().hasAll(['id', 'examId', 'shareSlug', 'displayName', 'answers', 'score', 'totalQuestions', 'correctCount', 'wrongCount', 'unansweredCount', 'startedAt', 'submittedAt', 'durationSeconds', 'createdBy']) &&
+        data.id is string &&
+        data.examId is string &&
+        data.shareSlug is string &&
+        data.displayName is string &&
+        optionalString(data, 'contact', 128) &&
+        optionalString(data, 'className', 128) &&
+        data.answers is map &&
+        data.score is number &&
+        data.score >= 0 &&
+        data.score <= 10 &&
+        data.totalQuestions is number &&
+        data.correctCount is number &&
+        data.wrongCount is number &&
+        data.unansweredCount is number &&
+        data.startedAt is string &&
+        data.submittedAt is string &&
+        data.durationSeconds is number &&
+        optionalString(data, 'teacherId', 128) &&
+        data.createdBy is string;
     }
 
     function isValidAttempt(data) {
@@ -217,13 +268,14 @@ service cloud.firestore {
     }
 
     match /students/{studentId} {
-      allow read: if isOwner(studentId) || isStaff();
+      allow read: if isOwner(studentId) || isAdmin() || (isTeacher() && resource.data.teacherId == request.auth.uid);
       allow create: if signedIn() &&
         isValidStudent(request.resource.data) &&
         (
           (isOwner(studentId) && request.resource.data.role == 'student' && request.resource.data.id == request.auth.uid) ||
           (adminEmail() && request.resource.data.id == request.auth.uid && request.resource.data.role == 'admin') ||
-          isAdmin()
+          isAdmin() ||
+          (isTeacher() && request.resource.data.role == 'student' && request.resource.data.teacherId == request.auth.uid)
         );
       allow update: if signedIn() &&
         isValidStudent(request.resource.data) &&
@@ -236,7 +288,11 @@ service cloud.firestore {
             request.resource.data.streak == resource.data.streak &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'username', 'avatar'])
           ) ||
-          isAdmin()
+          isAdmin() ||
+          (isTeacher() &&
+            resource.data.teacherId == request.auth.uid &&
+            request.resource.data.teacherId == resource.data.teacherId &&
+            request.resource.data.role == 'student')
         );
       allow delete: if isAdmin();
     }
@@ -248,9 +304,20 @@ service cloud.firestore {
     }
 
     match /lessons/{lessonId} {
-      allow read: if signedIn();
-      allow create, update: if isStaff() && isValidLesson(request.resource.data);
-      allow delete: if isStaff();
+      allow read: if signedIn() && (
+        isAdmin() ||
+        ownsData(resource.data) ||
+        !resource.data.keys().hasAny(['status']) ||
+        resource.data.status == 'published'
+      );
+      allow create: if isStaff() &&
+        isValidLesson(request.resource.data) &&
+        (isAdmin() || request.resource.data.createdBy == request.auth.uid || request.resource.data.teacherId == request.auth.uid);
+      allow update: if isStaff() &&
+        ownsData(resource.data) &&
+        isValidLesson(request.resource.data) &&
+        (isAdmin() || request.resource.data.createdBy == resource.data.createdBy);
+      allow delete: if isAdmin() || (isTeacher() && ownsData(resource.data));
 
       match /discussions/{discussionId} {
         allow read: if signedIn();
@@ -261,14 +328,30 @@ service cloud.firestore {
 
     match /quizzes/{questionId} {
       allow read: if signedIn();
-      allow create, update: if isStaff() && isValidQuiz(request.resource.data);
-      allow delete: if isStaff();
+      allow create: if isStaff() &&
+        isValidQuiz(request.resource.data) &&
+        (isAdmin() || request.resource.data.createdBy == request.auth.uid || request.resource.data.teacherId == request.auth.uid);
+      allow update: if isStaff() &&
+        ownsData(resource.data) &&
+        isValidQuiz(request.resource.data) &&
+        (isAdmin() || request.resource.data.createdBy == resource.data.createdBy);
+      allow delete: if isAdmin() || (isTeacher() && ownsData(resource.data));
     }
 
     match /examTemplates/{examId} {
-      allow read: if signedIn() && (isStaff() || resource.data.status == 'published');
-      allow create, update: if isStaff() && isValidExam(request.resource.data);
-      allow delete: if isStaff();
+      allow read: if signedIn() && (
+        isAdmin() ||
+        ownsData(resource.data) ||
+        resource.data.status == 'published'
+      );
+      allow create: if isStaff() &&
+        isValidExam(request.resource.data) &&
+        (isAdmin() || request.resource.data.createdBy == request.auth.uid || request.resource.data.teacherId == request.auth.uid);
+      allow update: if isStaff() &&
+        ownsData(resource.data) &&
+        isValidExam(request.resource.data) &&
+        (isAdmin() || request.resource.data.createdBy == resource.data.createdBy);
+      allow delete: if isAdmin() || (isTeacher() && ownsData(resource.data));
     }
 
     match /quizAttempts/{attemptId} {
@@ -285,6 +368,12 @@ service cloud.firestore {
         isValidWrongStat(request.resource.data) &&
         request.resource.data.userId == request.auth.uid;
       allow delete: if signedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    match /publicQuizAttempts/{attemptId} {
+      allow read: if isAdmin() || (signedIn() && ownsData(resource.data));
+      allow create, update: if isAdmin() && isValidPublicAttempt(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     match /tasks/{taskId} {

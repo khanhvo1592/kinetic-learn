@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Subject, Lesson, QuizQuestion, Student } from '../types';
 import { db } from '../lib/firebase';
-import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc, query, where } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 import { SUBJECTS, RECENT_LESSONS, CHEMISTRY_LESSONS, ATOM_QUIZ_QUESTIONS, MOCK_STUDENTS } from '../lib/seed';
 
@@ -31,6 +31,10 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | null>(null);
 
+function stripUndefined<T extends Record<string, any>>(value: T): T {
+  return Object.fromEntries(Object.entries(value).filter(([, fieldValue]) => fieldValue !== undefined)) as T;
+}
+
 export function useAppContext(): AppContextType {
   const ctx = useContext(AppContext);
   if (!ctx) throw new Error('useAppContext must be used within an AppProvider');
@@ -44,6 +48,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [quizzes, setQuizzes] = useState<QuizQuestion[]>([]);
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(true);
+
+  const getScopedCollectionDocs = useCallback(async <T,>(
+    collectionName: string,
+    visibilityField: 'status' | null = 'status'
+  ): Promise<T[]> => {
+    const colRef = collection(db, collectionName);
+    if (isAdmin) {
+      const snap = await getDocs(colRef);
+      return snap.docs.map(d => d.data() as T);
+    }
+
+    if (isTeacher && currentUser) {
+      const [createdSnap, assignedSnap] = await Promise.all([
+        getDocs(query(colRef, where('createdBy', '==', currentUser.id))),
+        getDocs(query(colRef, where('teacherId', '==', currentUser.id))),
+      ]);
+      const byId = new Map<string, T>();
+      createdSnap.docs.forEach(d => byId.set(d.id, d.data() as T));
+      assignedSnap.docs.forEach(d => byId.set(d.id, d.data() as T));
+      return Array.from(byId.values());
+    }
+
+    if (visibilityField) {
+      const snap = await getDocs(query(colRef, where(visibilityField, '==', 'published')));
+      return snap.docs.map(d => d.data() as T);
+    }
+
+    const snap = await getDocs(colRef);
+    return snap.docs.map(d => d.data() as T);
+  }, [currentUser, isAdmin, isTeacher]);
 
   // Load all data from Firestore
   const loadData = useCallback(async () => {
@@ -67,10 +101,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setSubjects(loadedSubjects);
 
       // Load lessons
-      const lessonsSnap = await getDocs(collection(db, 'lessons'));
-      let loadedLessons = lessonsSnap.docs.map(d => d.data() as Lesson);
+      let loadedLessons = await getScopedCollectionDocs<Lesson>('lessons');
 
-      if (loadedLessons.length === 0 && (isAdmin || isTeacher)) {
+      if (loadedLessons.length === 0 && isAdmin) {
         const allLessons = [...RECENT_LESSONS, ...CHEMISTRY_LESSONS];
         for (const l of allLessons) {
           await setDoc(doc(db, 'lessons', l.id), l);
@@ -82,10 +115,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setLessons(loadedLessons);
 
       // Load quizzes
-      const quizzesSnap = await getDocs(collection(db, 'quizzes'));
-      let loadedQuizzes = quizzesSnap.docs.map(d => d.data() as QuizQuestion);
+      let loadedQuizzes = await getScopedCollectionDocs<QuizQuestion>('quizzes', null);
 
-      if (loadedQuizzes.length === 0 && (isAdmin || isTeacher)) {
+      if (loadedQuizzes.length === 0 && isAdmin) {
         for (const q of ATOM_QUIZ_QUESTIONS) {
           await setDoc(doc(db, 'quizzes', q.id), q);
         }
@@ -98,10 +130,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       // Load students. Students only need their own profile for the MVP;
       // admins/teachers can load the roster for management and reports.
       if (isAdmin || isTeacher) {
-        const studentsSnap = await getDocs(collection(db, 'students'));
+        const studentsQuery = isAdmin
+          ? collection(db, 'students')
+          : query(collection(db, 'students'), where('teacherId', '==', currentUser.id));
+        const studentsSnap = await getDocs(studentsQuery);
         let loadedStudents = studentsSnap.docs.map(d => d.data() as Student);
 
-        if (loadedStudents.length <= 1) {
+        if (isAdmin && loadedStudents.length <= 1) {
           for (const s of MOCK_STUDENTS) {
             const existingDoc = await getDocs(collection(db, 'students'));
             const existingIds = existingDoc.docs.map(d => d.id);
@@ -122,7 +157,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsDataLoading(false);
     }
-  }, [currentUser, isAdmin, isTeacher]);
+  }, [currentUser, getScopedCollectionDocs, isAdmin, isTeacher]);
 
   useEffect(() => {
     if (currentUser) {
@@ -145,9 +180,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [refreshAll]);
 
   const addLesson = useCallback(async (lesson: Lesson) => {
-    await setDoc(doc(db, 'lessons', lesson.id), lesson);
+    const now = new Date().toISOString();
+    const ownerFields = currentUser ? {
+      createdBy: lesson.createdBy || currentUser.id,
+      teacherId: lesson.teacherId || currentUser.id,
+      createdAt: lesson.createdAt || now,
+      updatedAt: now,
+      status: lesson.status || ('published' as const),
+    } : {};
+    await setDoc(doc(db, 'lessons', lesson.id), stripUndefined({ ...lesson, ...ownerFields }));
     refreshAll();
-  }, [refreshAll]);
+  }, [currentUser, refreshAll]);
 
   const deleteLesson = useCallback(async (id: string) => {
     await deleteDoc(doc(db, 'lessons', id));
@@ -155,14 +198,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [refreshAll]);
 
   const updateLesson = useCallback(async (lesson: Lesson) => {
-    await setDoc(doc(db, 'lessons', lesson.id), lesson);
+    await setDoc(doc(db, 'lessons', lesson.id), stripUndefined({ ...lesson, updatedAt: new Date().toISOString() }));
     refreshAll();
   }, [refreshAll]);
 
 
   const addQuiz = useCallback(async (quiz: QuizQuestion) => {
-    await setDoc(doc(db, 'quizzes', quiz.id), quiz);
-    setQuizzes(prev => [...prev, quiz]);
+    const now = new Date().toISOString();
+    const nextQuiz = {
+      ...quiz,
+      createdBy: quiz.createdBy || currentUser?.id,
+      teacherId: quiz.teacherId || currentUser?.id,
+      createdAt: quiz.createdAt || now,
+      updatedAt: now,
+    };
+    await setDoc(doc(db, 'quizzes', quiz.id), stripUndefined(nextQuiz));
+    setQuizzes(prev => [...prev, nextQuiz]);
     if (quiz.subjectId) {
       const subj = subjects.find(s => s.id === quiz.subjectId);
       if (subj) {
@@ -171,11 +222,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setSubjects(prev => prev.map(s => s.id === subj.id ? updated : s));
       }
     }
-  }, [subjects]);
+  }, [currentUser, subjects]);
 
   const updateQuiz = useCallback(async (quiz: QuizQuestion) => {
-    await setDoc(doc(db, 'quizzes', quiz.id), quiz);
-    setQuizzes(prev => prev.map(q => q.id === quiz.id ? quiz : q));
+    const nextQuiz = { ...quiz, updatedAt: new Date().toISOString() };
+    await setDoc(doc(db, 'quizzes', quiz.id), stripUndefined(nextQuiz));
+    setQuizzes(prev => prev.map(q => q.id === quiz.id ? nextQuiz : q));
   }, []);
 
   const deleteQuiz = useCallback(async (id: string) => {
@@ -185,7 +237,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
 
   const updateStudent = useCallback(async (student: Student) => {
-    await setDoc(doc(db, 'students', student.id), student);
+    await setDoc(doc(db, 'students', student.id), stripUndefined(student));
     setAllStudents(prev => prev.map(s => s.id === student.id ? student : s));
   }, []);
 

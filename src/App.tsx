@@ -22,6 +22,7 @@ import ExamListPage from './pages/ExamListPage';
 import ExamPage from './pages/ExamPage';
 import WrongReviewPage from './pages/WrongReviewPage';
 import AdminPage from './pages/AdminPage';
+import PublicQuizPage from './pages/PublicQuizPage';
 
 // Auth Guard
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -49,6 +50,7 @@ export default function App() {
         <AppProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/public/quiz/:slug" element={<PublicQuizPage />} />
             
             {/* Protected Routes wrapped in PageShell */}
             <Route path="/" element={

@@ -51,12 +51,14 @@ export function useWrongQuestionStats() {
       const ref = doc(db, 'wrongQuestionStats', id);
       const snap = await getDoc(ref);
       const previous = snap.exists() ? snap.data() as WrongQuestionStat : null;
+      const subjectId = question?.subjectId || attempt.subjectId;
+      const lessonId = question?.lessonId || attempt.lessonId;
       const next: WrongQuestionStat = {
         id,
         userId: currentUser.id,
         questionId,
-        subjectId: question?.subjectId || attempt.subjectId,
-        lessonId: question?.lessonId || attempt.lessonId,
+        ...(subjectId ? { subjectId } : {}),
+        ...(lessonId ? { lessonId } : {}),
         wrongCount: (previous?.wrongCount || 0) + 1,
         lastWrongAt: now,
         lastAttemptId: attempt.id,

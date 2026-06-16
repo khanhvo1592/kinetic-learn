@@ -6,6 +6,7 @@ import { Subject, Lesson, QuizQuestion, Student, ExamTemplate } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 import { useAuth } from '../hooks/useAuth';
 import { useExamTemplates } from '../hooks/useExamTemplates';
+import { usePublicQuizAttempts } from '../hooks/usePublicQuizAttempts';
 
 export default function AdminPage() {
   const navigate = useNavigate();
@@ -21,9 +22,10 @@ export default function AdminPage() {
   const { isAdmin } = useAuth();
   const { currentUser } = useAuth();
   const { examTemplates, saveExamTemplate, deleteExamTemplate } = useExamTemplates();
+  const { attempts: publicQuizAttempts } = usePublicQuizAttempts();
   
   // Tabs: 'subject' | 'lesson' | 'quiz' | 'exam' | 'students'
-  const [activeTab, setActiveTab] = useState<'subject' | 'lesson' | 'quiz' | 'exam' | 'students'>(isAdmin ? 'students' : 'lesson');
+  const [activeTab, setActiveTab] = useState<'subject' | 'lesson' | 'quiz' | 'exam' | 'results' | 'students'>(isAdmin ? 'students' : 'lesson');
   const [successMsg, setSuccessMsg] = useState('');
 
   // 1. Subject Form States
@@ -37,6 +39,9 @@ export default function AdminPage() {
   const [lessonTitle, setLessonTitle] = useState('');
   const [lessonChapter, setLessonChapter] = useState('');
   const [lessonSummary, setLessonSummary] = useState('');
+  const [lessonMediaType, setLessonMediaType] = useState<'none' | 'image' | 'youtube' | 'video'>('none');
+  const [lessonMediaUrl, setLessonMediaUrl] = useState('');
+  const [lessonStatus, setLessonStatus] = useState<'draft' | 'published' | 'archived'>('published');
   const [formulaInput, setFormulaInput] = useState('');
   const [lessonSections, setLessonSections] = useState([{ title: '1. Khảo sát lý thuyết', content: '', type: 'text' as const }, { title: '2. Ví dụ áp dụng', content: '', type: 'text' as const }]);
   const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
@@ -110,6 +115,7 @@ export default function AdminPage() {
     if (!lessonTitle.trim()) return;
 
     const matchSubj = subjects.find(s => s.id === selectedSubjId);
+    const now = new Date().toISOString();
     
     if (editingLessonId) {
       const existing = lessons.find(l => l.id === editingLessonId);
@@ -120,6 +126,13 @@ export default function AdminPage() {
           subjectName: matchSubj ? matchSubj.name : existing.subjectName,
           title: lessonTitle.trim(),
           chapter: lessonChapter.trim() || 'Chương 1',
+          mediaType: lessonMediaType,
+          mediaUrl: lessonMediaUrl.trim() || undefined,
+          videoUrl: lessonMediaType === 'video' ? lessonMediaUrl.trim() : existing.videoUrl,
+          status: lessonStatus,
+          teacherId: existing.teacherId || existing.createdBy || currentUser?.id,
+          createdBy: existing.createdBy || currentUser?.id,
+          updatedAt: now,
           summary: lessonSummary.trim() || 'Tóm tắt bài học mới cập nhật từ giáo viên.',
           formulaTitle: formulaInput ? 'CÔNG THỨC CHỦ CHỐT' : undefined,
           formulas: formulaInput ? [formulaInput] : undefined,
@@ -135,6 +148,14 @@ export default function AdminPage() {
         subjectName: matchSubj ? matchSubj.name : 'Môn học mới',
         title: lessonTitle.trim(),
         chapter: lessonChapter.trim() || 'Chương 1',
+        mediaType: lessonMediaType,
+        mediaUrl: lessonMediaUrl.trim() || undefined,
+        videoUrl: lessonMediaType === 'video' ? lessonMediaUrl.trim() : undefined,
+        status: lessonStatus,
+        teacherId: currentUser?.id,
+        createdBy: currentUser?.id,
+        createdAt: now,
+        updatedAt: now,
         progress: 0,
         duration: '15 phút',
         lastStudied: 'Chưa học',
@@ -158,6 +179,9 @@ export default function AdminPage() {
     setLessonTitle('');
     setLessonChapter('');
     setLessonSummary('');
+    setLessonMediaType('none');
+    setLessonMediaUrl('');
+    setLessonStatus('published');
     setFormulaInput('');
     setLessonSections([{ title: '', content: '', type: 'text' }]);
   };
@@ -168,6 +192,9 @@ export default function AdminPage() {
     setLessonTitle(lesson.title);
     setLessonChapter(lesson.chapter);
     setLessonSummary(lesson.summary || '');
+    setLessonMediaType(lesson.mediaType || (lesson.videoUrl ? 'video' : 'none'));
+    setLessonMediaUrl(lesson.mediaUrl || lesson.videoUrl || '');
+    setLessonStatus(lesson.status || 'published');
     setFormulaInput(lesson.formulas && lesson.formulas.length > 0 ? lesson.formulas[0] : '');
     setLessonSections(lesson.sections && lesson.sections.length > 0 ? lesson.sections : [{ title: '1. Khảo sát lý thuyết', content: '', type: 'text' }]);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -349,6 +376,11 @@ export default function AdminPage() {
       shuffleQuestions: existing?.shuffleQuestions ?? false,
       shuffleOptions: existing?.shuffleOptions ?? false,
       status,
+      isPublic: status === 'published' ? true : existing?.isPublic,
+      shareSlug: existing?.shareSlug,
+      publicTitle: existing?.publicTitle || examTitle.trim(),
+      requireName: true,
+      teacherId: existing?.teacherId || currentUser.id,
       createdBy: existing?.createdBy || currentUser.id,
       createdAt: existing?.createdAt || now,
       updatedAt: now,
@@ -387,10 +419,10 @@ export default function AdminPage() {
       avatar: `https://api.dicebear.com/7.x/notionists/svg?seed=${newStudUsername.trim().toLowerCase()}`,
       xp: Number(newStudXp) || 0,
       streak: Number(newStudStreak) || 0,
-      role: newStudRole,
+      role: isAdmin ? newStudRole : 'student',
       status: 'active',
       email: newStudEmail.trim() || `${newStudUsername.trim().toLowerCase()}@kinetic.edu.vn`,
-      teacherId: newStudTeacherId || undefined,
+      teacherId: newStudTeacherId || (!isAdmin ? currentUser?.id : undefined),
       password: newStudPassword.trim(),
       createdAt: new Date().toISOString().split('T')[0]
     };
@@ -455,6 +487,19 @@ export default function AdminPage() {
     }
   };
 
+  if (!isAdmin && currentUser?.role !== 'teacher') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-center">
+        <div className="bg-white rounded-2xl border border-slate-100 p-6 max-w-md">
+          <span className="material-symbols-outlined text-4xl text-slate-400">lock</span>
+          <h1 className="font-display font-black text-xl text-slate-800 mt-3">Không có quyền truy cập</h1>
+          <p className="text-sm text-slate-500 mt-2">Khu vực này dành cho giáo viên và quản trị viên.</p>
+          <button onClick={() => navigate('/')} className="mt-5 px-4 py-2 rounded-xl bg-[#0058be] text-white font-bold text-sm">Về trang chủ</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 flex">
       {/* Sidebar */}
@@ -472,7 +517,7 @@ export default function AdminPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-          {isAdmin && (
+          {(isAdmin || currentUser?.role === 'teacher') && (
             <button
               onClick={() => setActiveTab('students')}
               className={`w-full text-left px-4 py-3 rounded-xl font-display font-bold text-sm transition-all flex items-center gap-3 ${
@@ -519,6 +564,15 @@ export default function AdminPage() {
             <span className="material-symbols-outlined">assignment</span>
             Tạo đề kiểm tra
           </button>
+          <button
+            onClick={() => setActiveTab('results')}
+            className={`w-full text-left px-4 py-3 rounded-xl font-display font-bold text-sm transition-all flex items-center gap-3 ${
+              activeTab === 'results' ? 'bg-blue-50 text-[#0058be]' : 'bg-transparent text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <span className="material-symbols-outlined">bar_chart</span>
+            Kết quả public
+          </button>
         </div>
 
         <div className="p-4 border-t border-slate-100">
@@ -545,7 +599,7 @@ export default function AdminPage() {
           )}
 
           {/* TAB: STUDENTS MANAGEMENT (Requested Feature) */}
-          {isAdmin && activeTab === 'students' && (
+          {(isAdmin || currentUser?.role === 'teacher') && activeTab === 'students' && (
             <div className="space-y-6 font-sans text-xs">
               
               {/* Quick Metrics stats banner */}
@@ -653,7 +707,7 @@ export default function AdminPage() {
                       className="w-full bg-slate-50 border border-slate-200 focus:border-[#0058be] rounded-lg px-3 py-2 text-xs outline-none font-bold"
                     >
                       <option value="student">Học sinh</option>
-                      <option value="teacher">Giáo viên</option>
+                      {isAdmin && <option value="teacher">Giáo viên</option>}
                     </select>
                   </div>
 
@@ -809,12 +863,12 @@ export default function AdminPage() {
                                 onUpdateStudent({ ...student, role: e.target.value as any });
                                 triggerToast(`Đã đổi quyền thành ${e.target.value === 'teacher' ? 'Giáo viên' : e.target.value === 'admin' ? 'Admin' : 'Học sinh'}`);
                               }}
-                              disabled={student.id === 'stud-001'}
+                              disabled={!isAdmin || student.id === 'stud-001'}
                               className="bg-slate-50 border border-slate-200 text-[10px] rounded px-1 py-1 outline-none font-bold mr-1"
                             >
                               <option value="student">Học sinh</option>
-                              <option value="teacher">Giáo viên</option>
-                              <option value="admin">Admin</option>
+                              {isAdmin && <option value="teacher">Giáo viên</option>}
+                              {isAdmin && <option value="admin">Admin</option>}
                             </select>
 
                             <select
@@ -1018,6 +1072,59 @@ export default function AdminPage() {
                 />
               </div>
 
+              <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-4">
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                  <div>
+                    <h4 className="font-display font-black text-sm text-slate-800">1. Hình ảnh / Video chính</h4>
+                    <p className="text-[10px] text-slate-500 mt-1">Đây là phần học sinh thấy đầu tiên khi mở bài học.</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <select
+                      value={lessonMediaType}
+                      onChange={(e) => setLessonMediaType(e.target.value as any)}
+                      className="bg-slate-50 border-2 border-slate-200 focus:border-[#0058be] rounded-xl px-3 py-2.5 text-xs outline-none"
+                    >
+                      <option value="none">Không có media</option>
+                      <option value="image">Hình ảnh</option>
+                      <option value="youtube">YouTube</option>
+                      <option value="video">Video MP4</option>
+                    </select>
+                    <select
+                      value={lessonStatus}
+                      onChange={(e) => setLessonStatus(e.target.value as any)}
+                      className="bg-slate-50 border-2 border-slate-200 focus:border-[#0058be] rounded-xl px-3 py-2.5 text-xs outline-none"
+                    >
+                      <option value="published">Xuất bản</option>
+                      <option value="draft">Lưu nháp</option>
+                      <option value="archived">Ẩn bài</option>
+                    </select>
+                  </div>
+                  <input
+                    type="url"
+                    value={lessonMediaUrl}
+                    onChange={(e) => setLessonMediaUrl(e.target.value)}
+                    disabled={lessonMediaType === 'none'}
+                    placeholder={lessonMediaType === 'youtube' ? 'https://www.youtube.com/watch?v=...' : lessonMediaType === 'image' ? 'https://example.com/cover.jpg' : 'https://example.com/video.mp4'}
+                    className="w-full bg-slate-50 border-2 border-slate-200 focus:border-[#0058be] rounded-xl px-4 py-3 text-xs outline-none disabled:opacity-50"
+                  />
+                </div>
+
+                <div className="bg-slate-900 rounded-2xl overflow-hidden aspect-video flex items-center justify-center text-white">
+                  {lessonMediaType === 'image' && lessonMediaUrl ? (
+                    <img src={lessonMediaUrl} alt="Lesson preview" className="w-full h-full object-cover" />
+                  ) : lessonMediaType === 'video' && lessonMediaUrl ? (
+                    <video src={lessonMediaUrl} controls className="w-full h-full object-cover" />
+                  ) : lessonMediaType === 'youtube' && lessonMediaUrl && getYoutubeId(lessonMediaUrl) ? (
+                    <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${getYoutubeId(lessonMediaUrl)}`} title="Lesson preview" allowFullScreen />
+                  ) : (
+                    <div className="text-center p-6">
+                      <span className="material-symbols-outlined text-5xl text-white/70">smart_display</span>
+                      <p className="text-sm font-bold mt-2">Preview media bài học</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="space-y-1">
                 <label className="font-bold text-slate-600 uppercase tracking-wider">Tóm tắt ngắn</label>
                 <textarea
@@ -1043,8 +1150,8 @@ export default function AdminPage() {
               <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                   <div>
-                    <span className="font-display font-black text-sm text-[#0058be] block">Nội dung bài giảng chi tiết</span>
-                    <span className="text-[10px] text-slate-500 font-sans">Thêm các khối nội dung (văn bản, video, hình ảnh)</span>
+                    <span className="font-display font-black text-sm text-[#0058be] block">2. Chapter sidebar + 3. Chi tiết bài học</span>
+                    <span className="text-[10px] text-slate-500 font-sans">Mỗi chapter là một khối nội dung học sinh có thể chọn ở sidebar.</span>
                   </div>
                   <button 
                     type="button" 
@@ -1055,9 +1162,27 @@ export default function AdminPage() {
                   </button>
                 </div>
                 
-                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-4">
+                  <aside className="bg-slate-50 border border-slate-200 rounded-xl p-3 h-fit lg:sticky lg:top-3">
+                    <p className="font-display font-black text-xs text-slate-700 mb-3">Chapters</p>
+                    <div className="space-y-2">
+                      {lessonSections.map((sec, idx) => (
+                        <button
+                          key={`${sec.title}-${idx}`}
+                          type="button"
+                          onClick={() => document.getElementById(`lesson-section-${idx}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                          className="w-full text-left px-3 py-2 rounded-lg bg-white border border-slate-100 hover:border-[#0058be]/30 text-xs font-bold text-slate-700"
+                        >
+                          <span className="text-[#0058be] mr-1">{idx + 1}.</span>
+                          {sec.title || `Chapter ${idx + 1}`}
+                        </button>
+                      ))}
+                    </div>
+                  </aside>
+
+                <div className="space-y-4 max-h-[620px] overflow-y-auto pr-2">
                   {lessonSections.map((sec, idx) => (
-                    <div key={idx} className="space-y-3 relative p-4 bg-slate-50 border-2 border-slate-100 rounded-xl hover:border-[#0058be]/30 transition-colors group">
+                    <div id={`lesson-section-${idx}`} key={idx} className="space-y-3 relative p-4 bg-slate-50 border-2 border-slate-100 rounded-xl hover:border-[#0058be]/30 transition-colors group">
                       <div className="absolute right-3 top-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           type="button"
@@ -1206,6 +1331,7 @@ export default function AdminPage() {
                       </div>
                     </div>
                   ))}
+                </div>
                 </div>
               </div>
 
@@ -1423,6 +1549,19 @@ export default function AdminPage() {
                         <p className="text-[11px] text-slate-500 mt-1">{exam.questionIds.length} câu • {Math.round(exam.durationSeconds / 60)} phút</p>
                       </div>
                       <div className="flex gap-2 shrink-0">
+                        {exam.status === 'published' && exam.shareSlug && (
+                          <button
+                            onClick={() => {
+                              const url = `${window.location.origin}/public/quiz/${exam.shareSlug}`;
+                              navigator.clipboard?.writeText(url);
+                              triggerToast('Đã sao chép link làm bài public!');
+                            }}
+                            className="w-9 h-9 rounded-lg bg-white border border-slate-200 text-emerald-600 hover:bg-emerald-50"
+                            title="Sao chép link public"
+                          >
+                            <span className="material-symbols-outlined text-base">link</span>
+                          </button>
+                        )}
                         <button onClick={() => startEditExam(exam)} className="w-9 h-9 rounded-lg bg-white border border-slate-200 text-blue-600 hover:bg-blue-50">
                           <span className="material-symbols-outlined text-base">edit</span>
                         </button>
@@ -1439,6 +1578,58 @@ export default function AdminPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'results' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-[24px] p-6 shadow-sm border border-slate-100">
+                <div className="flex items-center justify-between gap-4 mb-5">
+                  <div>
+                    <h3 className="font-display font-black text-xl text-slate-800">Kết quả làm bài public</h3>
+                    <p className="text-xs text-slate-500 mt-1">Theo dõi các lượt làm bài từ link không cần đăng nhập.</p>
+                  </div>
+                  <span className="px-3 py-1 rounded-full bg-blue-50 text-[#0058be] text-xs font-black">{publicQuizAttempts.length} lượt nộp</span>
+                </div>
+
+                <div className="space-y-3">
+                  {publicQuizAttempts.length === 0 ? (
+                    <div className="text-center py-10 text-slate-400">
+                      <span className="material-symbols-outlined text-5xl">inbox</span>
+                      <p className="font-bold text-sm mt-2">Chưa có kết quả public nào.</p>
+                    </div>
+                  ) : publicQuizAttempts.map(attempt => {
+                    const exam = examTemplates.find(e => e.id === attempt.examId || e.shareSlug === attempt.shareSlug);
+                    return (
+                      <div key={attempt.id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div>
+                          <h4 className="font-display font-bold text-sm text-slate-800">{attempt.displayName}</h4>
+                          <p className="text-[11px] text-slate-500 mt-1">{exam?.title || attempt.shareSlug} • {attempt.className || 'Chưa nhập lớp'} • {new Date(attempt.submittedAt).toLocaleString('vi-VN')}</p>
+                          {attempt.contact && <p className="text-[11px] text-slate-400 mt-0.5">{attempt.contact}</p>}
+                        </div>
+                        <div className="grid grid-cols-4 gap-2 text-center shrink-0">
+                          <div className="bg-white rounded-xl px-3 py-2 border border-slate-100">
+                            <p className="font-black text-[#0058be]">{attempt.score}/10</p>
+                            <p className="text-[9px] font-bold text-slate-400">Điểm</p>
+                          </div>
+                          <div className="bg-white rounded-xl px-3 py-2 border border-slate-100">
+                            <p className="font-black text-emerald-600">{attempt.correctCount}</p>
+                            <p className="text-[9px] font-bold text-slate-400">Đúng</p>
+                          </div>
+                          <div className="bg-white rounded-xl px-3 py-2 border border-slate-100">
+                            <p className="font-black text-rose-600">{attempt.wrongCount}</p>
+                            <p className="text-[9px] font-bold text-slate-400">Sai</p>
+                          </div>
+                          <div className="bg-white rounded-xl px-3 py-2 border border-slate-100">
+                            <p className="font-black text-slate-600">{attempt.unansweredCount}</p>
+                            <p className="text-[9px] font-bold text-slate-400">Trống</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
