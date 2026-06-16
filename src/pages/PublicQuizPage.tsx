@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { PublicQuizQuestion } from '../types';
+import { collection, doc, getDoc, getDocs, limit, query, setDoc, where } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { PublicQuizQuestion, QuizQuestion } from '../types';
 
 interface PublicQuizPayload {
   id: string;
@@ -21,6 +23,17 @@ interface PublicQuizResult {
   durationSeconds: number;
 }
 
+interface ClientQuizFallback {
+  payload: PublicQuizPayload;
+  answerKeys: Record<string, string>;
+  meta: {
+    examId: string;
+    shareSlug: string;
+    createdBy: string;
+    teacherId?: string;
+  };
+}
+
 async function readJsonResponse<T>(res: Response, fallbackMessage: string): Promise<T> {
   const contentType = res.headers.get('content-type') || '';
   const rawBody = await res.text();
@@ -38,6 +51,53 @@ async function readJsonResponse<T>(res: Response, fallbackMessage: string): Prom
   return data as T;
 }
 
+async function loadPublicQuizFromClient(slug: string): Promise<ClientQuizFallback> {
+  const examQuery = query(
+    collection(db, 'examTemplates'),
+    where('shareSlug', '==', slug),
+    where('status', '==', 'published'),
+    where('isPublic', '==', true),
+    limit(1)
+  );
+  const examSnap = await getDocs(examQuery);
+
+  if (examSnap.empty) {
+    throw new Error('Link làm bài không tồn tại hoặc đã bị ẩn.');
+  }
+
+  const examDoc = examSnap.docs[0];
+  const exam = examDoc.data() as any;
+  const questionIds = Array.isArray(exam.questionIds) ? exam.questionIds : [];
+  const questionDocs = await Promise.all(questionIds.map((questionId: string) => getDoc(doc(db, 'quizzes', questionId))));
+  const questions = questionDocs
+    .filter(questionDoc => questionDoc.exists())
+    .map(questionDoc => questionDoc.data() as QuizQuestion);
+  const answerKeys = Object.fromEntries(questions.map(question => [question.id, question.correctKey]));
+
+  return {
+    payload: {
+      id: examDoc.id,
+      title: exam.publicTitle || exam.title,
+      durationSeconds: exam.durationSeconds || 15 * 60,
+      requireName: exam.requireName !== false,
+      questionCount: questions.length,
+      questions: questions.map((question, index) => ({
+        id: question.id,
+        num: String(index + 1).padStart(2, '0'),
+        question: question.question,
+        options: question.options,
+      })),
+    },
+    answerKeys,
+    meta: {
+      examId: examDoc.id,
+      shareSlug: slug,
+      createdBy: exam.createdBy,
+      teacherId: exam.teacherId || exam.createdBy,
+    },
+  };
+}
+
 export default function PublicQuizPage() {
   const { slug } = useParams<{ slug: string }>();
   const startTimeRef = useRef(new Date().toISOString());
@@ -52,23 +112,37 @@ export default function PublicQuizPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [clientAnswerKeys, setClientAnswerKeys] = useState<Record<string, string> | null>(null);
+  const [clientMeta, setClientMeta] = useState<ClientQuizFallback['meta'] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
-    fetch(`/api/public-quiz/${slug}`)
-      .then(async (res) => {
-        return readJsonResponse<PublicQuizPayload>(res, 'Không thể tải đề.');
-      })
-      .then((data) => {
+    const loadQuiz = async () => {
+      setIsLoading(true);
+      setError('');
+      setClientAnswerKeys(null);
+      setClientMeta(null);
+
+      try {
+        const res = await fetch(`/api/public-quiz/${slug}`);
+        const data = await readJsonResponse<PublicQuizPayload>(res, 'Không thể tải đề.');
         if (!cancelled) setQuiz(data);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err.message);
-      })
-      .finally(() => {
+      } catch (apiError: any) {
+        try {
+          const fallback = await loadPublicQuizFromClient(String(slug || ''));
+          if (!cancelled) {
+            setQuiz(fallback.payload);
+            setClientAnswerKeys(fallback.answerKeys);
+            setClientMeta(fallback.meta);
+          }
+        } catch {
+          if (!cancelled) setError(apiError.message || 'Không thể tải đề.');
+        }
+      } finally {
         if (!cancelled) setIsLoading(false);
-      });
+      }
+    };
+    loadQuiz();
     return () => {
       cancelled = true;
     };
@@ -112,6 +186,49 @@ export default function PublicQuizPage() {
       const data = await readJsonResponse<PublicQuizResult>(res, 'Không thể nộp bài.');
       setResult(data as PublicQuizResult);
     } catch (err: any) {
+      if (clientAnswerKeys && clientMeta) {
+        const now = new Date();
+        const startedAtMs = Date.parse(startTimeRef.current);
+        const durationSeconds = Number.isFinite(startedAtMs)
+          ? Math.max(0, Math.floor((now.getTime() - startedAtMs) / 1000))
+          : 0;
+        const correctCount = quiz.questions.filter(question => answers[question.id] === clientAnswerKeys[question.id]).length;
+        const unansweredCount = quiz.questions.filter(question => !answers[question.id]).length;
+        const wrongCount = quiz.questions.length - correctCount - unansweredCount;
+        const attemptId = `public-attempt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const fallbackResult: PublicQuizResult = {
+          attemptId,
+          score: quiz.questions.length > 0 ? Math.round((correctCount / quiz.questions.length) * 10) : 0,
+          totalQuestions: quiz.questions.length,
+          correctCount,
+          wrongCount,
+          unansweredCount,
+          durationSeconds,
+        };
+
+        await setDoc(doc(db, 'publicQuizAttempts', attemptId), {
+          id: attemptId,
+          examId: clientMeta.examId,
+          shareSlug: clientMeta.shareSlug,
+          displayName,
+          ...(contact ? { contact } : {}),
+          ...(className ? { className } : {}),
+          answers,
+          score: fallbackResult.score,
+          totalQuestions: fallbackResult.totalQuestions,
+          correctCount,
+          wrongCount,
+          unansweredCount,
+          startedAt: startTimeRef.current,
+          submittedAt: now.toISOString(),
+          durationSeconds,
+          teacherId: clientMeta.teacherId,
+          createdBy: clientMeta.createdBy,
+        });
+        setResult(fallbackResult);
+        return;
+      }
+
       setError(err.message || 'Không thể nộp bài.');
     } finally {
       setIsSubmitting(false);

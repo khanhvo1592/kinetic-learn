@@ -11,6 +11,7 @@ function getAdminDb() {
       process.env.GOOGLE_CLOUD_PROJECT ||
       'kinetic-learning-backend';
     const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
+    const canUseApplicationDefault = Boolean(process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.K_SERVICE);
     if (serviceAccountJson) {
       const serviceAccount = JSON.parse(serviceAccountJson);
       if (serviceAccount.private_key) {
@@ -21,6 +22,12 @@ function getAdminDb() {
         projectId,
       });
     } else {
+      if (!canUseApplicationDefault) {
+        const error = new Error('Firebase Admin chưa được cấu hình. Hãy thêm FIREBASE_SERVICE_ACCOUNT hoặc GOOGLE_APPLICATION_CREDENTIALS để API public quiz đọc được Firestore.');
+        (error as any).statusCode = 500;
+        throw error;
+      }
+
       initializeApp({
         credential: applicationDefault(),
         projectId,

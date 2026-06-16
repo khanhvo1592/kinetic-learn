@@ -12,6 +12,7 @@ function getAdminDb() {
   if (!getApps().length) {
     const projectId = process.env.FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || "kinetic-learning-backend";
     const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT;
+    const canUseApplicationDefault = Boolean(process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.K_SERVICE);
     if (serviceAccountJson) {
       const serviceAccount = JSON.parse(serviceAccountJson);
       if (serviceAccount.private_key) {
@@ -22,6 +23,11 @@ function getAdminDb() {
         projectId
       });
     } else {
+      if (!canUseApplicationDefault) {
+        const error = new Error("Firebase Admin ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh. H\xE3y th\xEAm FIREBASE_SERVICE_ACCOUNT ho\u1EB7c GOOGLE_APPLICATION_CREDENTIALS \u0111\u1EC3 API public quiz \u0111\u1ECDc \u0111\u01B0\u1EE3c Firestore.");
+        error.statusCode = 500;
+        throw error;
+      }
       initializeApp({
         credential: applicationDefault(),
         projectId

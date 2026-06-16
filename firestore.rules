@@ -372,7 +372,8 @@ service cloud.firestore {
 
     match /publicQuizAttempts/{attemptId} {
       allow read: if isAdmin() || (signedIn() && ownsData(resource.data));
-      allow create, update: if isAdmin() && isValidPublicAttempt(request.resource.data);
+      allow create: if isValidPublicAttempt(request.resource.data) && (isAdmin() || (isTeacher() && ownsData(request.resource.data)));
+      allow update: if isAdmin() && isValidPublicAttempt(request.resource.data);
       allow delete: if isAdmin();
     }
 
