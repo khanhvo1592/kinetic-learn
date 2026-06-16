@@ -1,12 +1,77 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
 import { Subject, Lesson, QuizQuestion, Student, ExamTemplate } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 import { useAuth } from '../hooks/useAuth';
 import { useExamTemplates } from '../hooks/useExamTemplates';
 import { usePublicQuizAttempts } from '../hooks/usePublicQuizAttempts';
+
+function RichTextField({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const wrapSelection = (before: string, after = before) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = value.slice(start, end);
+    const nextValue = `${value.slice(0, start)}${before}${selectedText}${after}${value.slice(end)}`;
+    onChange(nextValue);
+
+    window.requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + before.length, end + before.length);
+    });
+  };
+
+  const insertList = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = value.slice(start, end).trim();
+    const items = selectedText
+      ? selectedText.split('\n').map(line => `<li>${line.replace(/^[-*]\s*/, '')}</li>`).join('')
+      : '<li>Mục nội dung</li>';
+    const nextValue = `${value.slice(0, start)}<ul>${items}</ul>${value.slice(end)}`;
+    onChange(nextValue);
+
+    window.requestAnimationFrame(() => textarea.focus());
+  };
+
+  return (
+    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden focus-within:border-[#0058be] shadow-sm">
+      <div className="flex items-center gap-1 border-b border-slate-100 bg-slate-50 px-2 py-1.5">
+        <button type="button" onClick={() => wrapSelection('<strong>', '</strong>')} className="h-8 w-8 rounded-md text-sm font-black text-slate-700 hover:bg-white border border-transparent hover:border-slate-200" title="In đậm">
+          B
+        </button>
+        <button type="button" onClick={() => wrapSelection('<em>', '</em>')} className="h-8 w-8 rounded-md text-sm italic font-bold text-slate-700 hover:bg-white border border-transparent hover:border-slate-200" title="In nghiêng">
+          I
+        </button>
+        <button type="button" onClick={insertList} className="h-8 px-2 rounded-md text-xs font-bold text-slate-700 hover:bg-white border border-transparent hover:border-slate-200" title="Danh sách">
+          List
+        </button>
+      </div>
+      <textarea
+        ref={textareaRef}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="min-h-48 w-full resize-y bg-white px-3 py-3 text-sm leading-relaxed outline-none"
+      />
+    </div>
+  );
+}
 
 export default function AdminPage() {
   const navigate = useNavigate();
@@ -1268,19 +1333,15 @@ export default function AdminPage() {
                           {sec.type === 'video' ? 'Link YouTube' : sec.type === 'video_raw' ? 'Link Video (MP4)' : sec.type === 'image' ? 'Link hình ảnh (URL)' : sec.type === 'audio' ? 'Link Âm thanh (MP3)' : 'Nội dung văn bản'}
                         </label>
                         {sec.type === 'text' ? (
-                          <div className="bg-white rounded-lg border border-slate-200 overflow-hidden focus-within:border-[#0058be] shadow-sm">
-                            <ReactQuill
-                              theme="snow"
-                              value={sec.content}
-                              onChange={(val) => {
-                                const newSecs = [...lessonSections];
-                                newSecs[idx].content = val;
-                                setLessonSections(newSecs);
-                              }}
-                              placeholder="Nhập nội dung chi tiết bài học (hỗ trợ in đậm, danh sách...)"
-                              className="h-48 pb-10"
-                            />
-                          </div>
+                          <RichTextField
+                            value={sec.content}
+                            onChange={(val) => {
+                              const newSecs = [...lessonSections];
+                              newSecs[idx].content = val;
+                              setLessonSections(newSecs);
+                            }}
+                            placeholder="Nhập nội dung chi tiết bài học (có thể dùng HTML như <strong>, <ul>, <li>...)"
+                          />
                         ) : (
                           <input
                             type="url"
