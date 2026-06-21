@@ -8,6 +8,7 @@ import { Discussion } from '../types';
 import AITutor from '../components/modals/AITutor';
 import Dictionary from '../components/modals/Dictionary';
 import StudyNotes from '../components/modals/StudyNotes';
+import MathText from '../components/common/MathText';
 
 export default function LessonPage() {
   const { id } = useParams<{ id: string }>();
@@ -152,13 +153,14 @@ export default function LessonPage() {
 
               <div className="space-y-6">
               <div className="bento-card rounded-2xl p-4 bg-white/60">
-                <p className="text-slate-700 text-sm leading-relaxed font-sans">{lesson.summary}</p>
+                <p className="text-slate-700 text-sm leading-relaxed font-sans"><MathText text={lesson.summary} /></p>
               </div>
               {activeSection && (
                 <div>
                   <h3 className="font-display font-bold text-xl text-slate-800 mb-3">{activeSection.title}</h3>
                   <div className="text-sm text-slate-700 leading-relaxed font-sans whitespace-pre-line bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-                    {(!activeSection.type || activeSection.type === 'text') && <div dangerouslySetInnerHTML={{ __html: activeSection.content }} className="prose prose-sm max-w-none prose-slate" />}
+                    {(!activeSection.type || activeSection.type === 'text') && <div className="prose prose-sm max-w-none prose-slate"><MathText text={activeSection.content} allowHtml /></div>}
+                    {activeSection.type === 'formula' && <div className="font-mono bg-blue-50 border border-blue-100 rounded-xl p-3"><MathText text={activeSection.content} /></div>}
                     {activeSection.type === 'image' && <img src={activeSection.content} alt={activeSection.title} className="w-full h-auto rounded-xl" />}
                     {activeSection.type === 'audio' && <audio src={activeSection.content} controls className="w-full" />}
                     {activeSection.type === 'video_raw' && <video src={activeSection.content} controls className="w-full h-auto rounded-xl aspect-video" />}
@@ -186,7 +188,7 @@ export default function LessonPage() {
                   <ul className="space-y-2">
                     {lesson.formulas?.map((f, i) => (
                       <li key={i} className="flex gap-2 items-start text-sm text-slate-700 font-mono bg-white p-2 rounded-lg border border-slate-100 shadow-sm">
-                        <span className="text-[#0058be] mt-0.5">•</span> {f}
+                        <span className="text-[#0058be] mt-0.5">•</span> <MathText text={f} />
                       </li>
                     ))}
                   </ul>
@@ -202,7 +204,8 @@ export default function LessonPage() {
                 <div key={i}>
                   <h3 className="font-display font-bold text-lg text-slate-800 mb-3 text-cyan-800">{sec.title}</h3>
                   <div className="text-sm text-slate-700 leading-relaxed font-sans whitespace-pre-line bg-white p-4 rounded-[20px] shadow-sm border border-slate-100">
-                    {(!sec.type || sec.type === 'text') && <div dangerouslySetInnerHTML={{ __html: sec.content }} className="prose prose-sm max-w-none prose-slate" />}
+                    {(!sec.type || sec.type === 'text') && <div className="prose prose-sm max-w-none prose-slate"><MathText text={sec.content} allowHtml /></div>}
+                    {sec.type === 'formula' && <div className="font-mono bg-blue-50 border border-blue-100 rounded-xl p-3"><MathText text={sec.content} /></div>}
                     {sec.type === 'image' && <img src={sec.content} alt={sec.title} className="w-full h-auto rounded-xl" />}
                     {sec.type === 'audio' && <audio src={sec.content} controls className="w-full" />}
                     {sec.type === 'video_raw' && <video src={sec.content} controls className="w-full h-auto rounded-xl aspect-video" />}

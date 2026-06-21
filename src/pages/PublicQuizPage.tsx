@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { collection, doc, getDoc, getDocs, limit, query, setDoc, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { PublicQuizQuestion, QuizQuestion } from '../types';
+import MathText from '../components/common/MathText';
 
 interface PublicQuizPayload {
   id: string;
@@ -328,7 +329,7 @@ export default function PublicQuizPage() {
         {currentQuestion && (
           <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
             <h2 className="font-display font-bold text-lg text-slate-800 leading-relaxed">
-              <span className="text-slate-400 mr-2">{currentIdx + 1}.</span>{currentQuestion.question}
+              <span className="text-slate-400 mr-2">{currentIdx + 1}.</span><MathText text={currentQuestion.question} />
             </h2>
             <div className="space-y-3 mt-5">
               {currentQuestion.options.map(opt => {
@@ -340,7 +341,7 @@ export default function PublicQuizPage() {
                     className={`w-full text-left p-4 rounded-xl border-2 flex items-center gap-3 ${selected ? 'border-[#0058be] bg-blue-50 text-[#0058be]' : 'border-slate-200 hover:border-blue-200 text-slate-700'}`}
                   >
                     <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${selected ? 'bg-[#0058be] text-white' : 'bg-slate-100 text-slate-500'}`}>{opt.key}</span>
-                    <span className="font-semibold text-sm">{opt.text}</span>
+                    <span className="font-semibold text-sm"><MathText text={opt.text} /></span>
                   </button>
                 );
               })}

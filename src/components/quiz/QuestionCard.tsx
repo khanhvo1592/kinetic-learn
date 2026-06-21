@@ -1,5 +1,6 @@
 import React from 'react';
 import { QuizQuestion } from '../../types';
+import MathText from '../common/MathText';
 
 interface QuestionCardProps {
   question: QuizQuestion;
@@ -17,7 +18,7 @@ export default function QuestionCard({ question, selectedKey, isAnswered, isCorr
           {question.num}
         </div>
         <h2 className="font-display font-bold text-xl text-slate-800 leading-snug pt-1">
-          {question.question}
+          <MathText text={question.question} />
         </h2>
       </div>
 
@@ -56,7 +57,7 @@ export default function QuestionCard({ question, selectedKey, isAnswered, isCorr
               <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-display font-bold shrink-0 transition-colors ${letterClass}`}>
                 {opt.key}
               </div>
-              <span className="font-sans font-medium text-[15px]">{opt.text}</span>
+              <span className="font-sans font-medium text-[15px]"><MathText text={opt.text} /></span>
               {icon}
             </button>
           );
@@ -74,7 +75,7 @@ export default function QuestionCard({ question, selectedKey, isAnswered, isCorr
             </h4>
           </div>
           <p className="text-slate-700 font-sans text-sm leading-relaxed">
-            {question.explanation}
+            <MathText text={question.explanation} />
           </p>
         </div>
       )}

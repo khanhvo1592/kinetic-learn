@@ -6,6 +6,7 @@ import { useQuizAttempts } from '../hooks/useQuizAttempts';
 import { useWrongQuestionStats } from '../hooks/useWrongQuestionStats';
 import { useStudents } from '../hooks/useStudents';
 import { useAuth } from '../hooks/useAuth';
+import MathText from '../components/common/MathText';
 
 export default function ExamPage() {
   const { examId } = useParams<{ examId: string }>();
@@ -148,7 +149,7 @@ export default function ExamPage() {
         <div className="bg-white rounded-[24px] p-6 border border-slate-100 shadow-sm flex-1 mb-28">
           <h3 className="font-display font-bold text-lg text-slate-800 mb-6 leading-relaxed">
             <span className="text-slate-400 mr-2">{currentIdx + 1}.</span>
-            {currentQ.question}
+            <MathText text={currentQ.question} />
           </h3>
 
           <div className="space-y-3">
@@ -167,7 +168,7 @@ export default function ExamPage() {
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-colors ${isSelected ? 'bg-[#0058be] text-white' : 'bg-slate-100 text-slate-500'}`}>
                     {opt.key}
                   </div>
-                  <span className="font-semibold text-sm flex-1">{opt.text}</span>
+                  <span className="font-semibold text-sm flex-1"><MathText text={opt.text} /></span>
                 </button>
               );
             })}

@@ -128,9 +128,21 @@ export default function ResultPage() {
         </div>
 
         <div className="w-full space-y-3 mt-auto">
-          <button onClick={() => navigate(solutionsPath, { state: location.state })} className="w-full bg-white border-2 border-slate-200 text-slate-700 font-display font-bold py-4 rounded-[20px] tactile-card hover:bg-slate-50 active:scale-95 transition-all flex justify-center items-center gap-2">
+          <button
+            onClick={() => navigate(solutionsPath, {
+              state: {
+                ...location.state,
+                initialFilter: displayAttempt.wrongQuestionIds.length > 0
+                  ? 'wrong'
+                  : displayAttempt.unansweredQuestionIds.length > 0
+                    ? 'unanswered'
+                    : 'all',
+              },
+            })}
+            className="w-full bg-white border-2 border-slate-200 text-slate-700 font-display font-bold py-4 rounded-[20px] tactile-card hover:bg-slate-50 active:scale-95 transition-all flex justify-center items-center gap-2"
+          >
             <span className="material-symbols-outlined text-lg">fact_check</span>
-            Xem đáp án chi tiết
+            Xem câu sai và đáp án đúng
           </button>
           {(displayAttempt.wrongQuestionIds.length + displayAttempt.unansweredQuestionIds.length) > 0 && (
             <button onClick={() => navigate('/review/wrong')} className="w-full bg-rose-50 border-2 border-rose-100 text-rose-600 font-display font-bold py-4 rounded-[20px] tactile-card hover:bg-rose-100 active:scale-95 transition-all flex justify-center items-center gap-2">
